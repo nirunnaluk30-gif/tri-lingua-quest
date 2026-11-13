@@ -1,5 +1,5 @@
 rules_version = '2';
-// TRI-LINGUA Quest — Cloud Firestore security rules (v2, 2026-11-13)
+// TRI-LINGUA Quest — Cloud Firestore security rules (v2.1, 2026-11-13: + online count)
 // Each student signs in with an ID; their Firebase email is  id_<ID>@id.trilingua.local
 // and their player id in the game is  id_<ID>.  Admins are listed in /admins/{playerId}.
 // v2: only real game logins count (exact email form + password sign-in), saves and admin
@@ -78,6 +78,16 @@ service cloud.firestore {
     // trading board and town: everyone signed in reads, each player writes only their own
     match /market/{pid} { allow read: if signedIn(); allow write: if isAdmin() || ownsPlayer(pid); }
     match /town/{pid}   { allow read: if signedIn(); allow write: if isAdmin() || isMe(pid); }
+
+    // who is online: two small shared docs; each signed-in player stamps only their own key (a time number)
+    match /presence/{shard} {
+      allow read: if signedIn();
+      allow create: if signedIn() && shard.matches('s[0-9]')
+        && request.resource.data.keys().hasOnly([me()]) && request.resource.data[me()] is int;
+      allow update: if isAdmin() || (signedIn() && shard.matches('s[0-9]')
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([me()]) && request.resource.data[me()] is int);
+      allow delete: if isAdmin();
+    }
 
     // gem top-up requests: private to the student and admins
     match /topup/{pid} { allow read, write: if isAdmin() || ownsPlayer(pid); }
