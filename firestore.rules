@@ -1,5 +1,5 @@
 rules_version = '2';
-// TRI-LINGUA Quest — Cloud Firestore security rules (v2.2, 2026-11-13: + online count, hall of fame)
+// TRI-LINGUA Quest — Cloud Firestore security rules (v2.3, 2026-11-13: + online count, hall of fame)
 // Each student signs in with an ID; their Firebase email is  id_<ID>@id.trilingua.local
 // and their player id in the game is  id_<ID>.  Admins are listed in /admins/{playerId}.
 // v2: only real game logins count (exact email form + password sign-in), saves and admin
@@ -93,7 +93,7 @@ service cloud.firestore {
     // (but not the 👍/❤️ marks or the teacher's "hide"); visitors may only set their own 👍/❤️ mark
     match /board/{pid} {
       allow read: if signedIn();
-      allow create: if isMe(pid) && !('lk' in request.resource.data) && !('ht' in request.resource.data) && !('hid' in request.resource.data);
+      allow create: if isAdmin() || isMe(pid) && !('lk' in request.resource.data) && !('ht' in request.resource.data) && !('hid' in request.resource.data);
       allow update: if isAdmin()
         || (isMe(pid) && request.resource.data.get('lk', {}) == resource.data.get('lk', {})
             && request.resource.data.get('ht', {}) == resource.data.get('ht', {})
