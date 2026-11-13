@@ -1,5 +1,5 @@
 rules_version = '2';
-// TRI-LINGUA Quest — Cloud Firestore security rules (v2.1, 2026-11-13: + online count)
+// TRI-LINGUA Quest — Cloud Firestore security rules (v2.2, 2026-11-13: + online count, hall of fame)
 // Each student signs in with an ID; their Firebase email is  id_<ID>@id.trilingua.local
 // and their player id in the game is  id_<ID>.  Admins are listed in /admins/{playerId}.
 // v2: only real game logins count (exact email form + password sign-in), saves and admin
@@ -87,6 +87,22 @@ service cloud.firestore {
       allow update: if isAdmin() || (signedIn() && shard.matches('s[0-9]')
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([me()]) && request.resource.data[me()] is int);
       allow delete: if isAdmin();
+    }
+
+    // hall of fame / profile cards: everyone signed in reads; the owner writes their own card
+    // (but not the 👍/❤️ marks or the teacher's "hide"); visitors may only set their own 👍/❤️ mark
+    match /board/{pid} {
+      allow read: if signedIn();
+      allow create: if isMe(pid) && !('lk' in request.resource.data) && !('ht' in request.resource.data) && !('hid' in request.resource.data);
+      allow update: if isAdmin()
+        || (isMe(pid) && request.resource.data.get('lk', {}) == resource.data.get('lk', {})
+            && request.resource.data.get('ht', {}) == resource.data.get('ht', {})
+            && request.resource.data.get('hid', false) == resource.data.get('hid', false))
+        || (signedIn() && !isMe(pid)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lk', 'ht'])
+            && request.resource.data.get('lk', {}).diff(resource.data.get('lk', {})).affectedKeys().hasOnly([me()])
+            && request.resource.data.get('ht', {}).diff(resource.data.get('ht', {})).affectedKeys().hasOnly([me()]));
+      allow delete: if isAdmin() || isMe(pid);
     }
 
     // gem top-up requests: private to the student and admins
