@@ -1,5 +1,5 @@
 rules_version = '2';
-// TRI-LINGUA Quest — Cloud Firestore security rules (v2.3, 2026-11-13: + online count, hall of fame)
+// TRI-LINGUA Quest — Cloud Firestore security rules (v2.4, 2026-11-16: + instant-buy claims)
 // Each student signs in with an ID; their Firebase email is  id_<ID>@id.trilingua.local
 // and their player id in the game is  id_<ID>.  Admins are listed in /admins/{playerId}.
 // v2: only real game logins count (exact email form + password sign-in), saves and admin
@@ -78,6 +78,20 @@ service cloud.firestore {
     // trading board and town: everyone signed in reads, each player writes only their own
     match /market/{pid} { allow read: if signedIn(); allow write: if isAdmin() || ownsPlayer(pid); }
     match /town/{pid}   { allow read: if signedIn(); allow write: if isAdmin() || isMe(pid); }
+
+    // instant buy: one claim per offer, id = <seller>__<offer id>. It can be CREATED once and never changed,
+    // so only the first buyer (or the seller cancelling) wins. by = the buyer (or the seller for a cancel).
+    match /mkclaim/{cid} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['by', 's', 't'])
+        && request.resource.data.s is string && request.resource.data.by is string && request.resource.data.t is int
+        && cid.matches('id_[a-z0-9_.-]{3,20}__t[a-z0-9]{4,30}')
+        && cid.split('__')[0] == request.resource.data.s
+        && (request.resource.data.by == me() || request.resource.data.s == me());
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
 
     // who is online: two small shared docs; each signed-in player stamps only their own key (a time number)
     match /presence/{shard} {
