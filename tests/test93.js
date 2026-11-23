@@ -42,15 +42,20 @@ const clock = at => `(function(){var off=${OFF0};var D=Date;function N(){if(argu
   await P.click('.rd-ev [data-act=rdgo]'); await wait(700); await P.click('[data-act=rdjoin]'); await wait(500);
   const bar = await P.$$eval('[data-act=skuse]', a => a.map(b => b.dataset.id));
   check('fight bar has the 6 picked skills', JSON.stringify(bar) === JSON.stringify(['sw1', 'sw2', 'swa2', 'swb3', 'sw3', 'swa5']), bar.join(','));
+  const blocked = await P.evaluate(() => [...document.querySelectorAll('[data-act=skuse]')].every(b => b.disabled));
+  check('skills are locked until the first right answer', blocked);
+  const ansRight = async () => { await P.evaluate(() => { const R = window.__TLQ.raid, e = R.enc(), q = e.qs[e.i]; R.ans(q.ans) }); await wait(150); await P.evaluate(() => window.__TLQ.raid.next()); await wait(150) };
+  await ansRight();
   await P.click('[data-act=skuse][data-id=swa5]'); await wait(1600);
   const px = await P.evaluate(() => { const c = document.querySelector('.sk-canvas'); if (!c) return -1; const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 400) if (d[i] > 0) n++; return n });
   check('level-60 skill draws on the effect layer', px > 50, 'lit samples ' + px);
   await P.screenshot({ path: 'sk2-god.png' }); await wait(2600);
-  await P.click('[data-act=skuse][data-id=sw3]'); await wait(1200); await P.screenshot({ path: 'sk2-ult.png' }); await wait(1500);
-  for (let i = 0; i < 10; i++) {
-    if (i === 3) { await P.click('[data-act=skuse][data-id=sw2]'); await wait(300) }
-    if (i === 4) { await P.click('[data-act=skuse][data-id=swb3]'); await wait(1500) }
-    await P.evaluate(() => { const R = window.__TLQ.raid, e = R.enc(), q = e.qs[e.i]; R.ans(q.ans) }); await wait(150); await P.evaluate(() => window.__TLQ.raid.next()); await wait(150) }
+  const again = await P.evaluate(() => document.querySelector('[data-act=skuse][data-id=sw3]').disabled);
+  check('a second skill needs another right answer', again === true);
+  await ansRight(); await P.click('[data-act=skuse][data-id=sw3]'); await wait(1200); await P.screenshot({ path: 'sk2-ult.png' }); await wait(1500);
+  await ansRight(); await P.click('[data-act=skuse][data-id=sw2]'); await wait(300);
+  await ansRight(); await P.click('[data-act=skuse][data-id=swb3]'); await wait(1500);
+  for (let i = 4; i < 10; i++) await ansRight();
   await wait(2000);
   const e = await P.evaluate(() => window.__TLQ.S().log.filter(x => x.k === 'raid').slice(-1)[0]);
   const exp = await P.evaluate(() => ['swa5', 'sw3', 'sw2', 'swb3'].reduce((a, id) => a + window.__TLQ.skMax(id), 0));

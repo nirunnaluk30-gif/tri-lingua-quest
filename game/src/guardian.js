@@ -23,7 +23,8 @@ Object.assign(L,{
  gd_hidden:m('ซ่อนภูตไว้ ภูตจะไม่ช่วยตีบอส','Spirit hidden: it will not help in raids','守护灵已隐藏,不会协助首领战')});
 if(typeof CFG_LABELS!=='undefined')Object.assign(CFG_LABELS,{gdOn:m('เปิดภูตพิทักษ์ (1 = เปิด, 0 = ปิด)','Guardian spirits on (1 = on, 0 = off)','开启守护灵(1 开 0 关)'),gdDmg:m('ภูตพิทักษ์ลดเลือดบอสต่อข้อที่ตอบถูก','Guardian damage per right answer','守护灵每答对一题的伤害')});
 function gdOn(){return CFG.gdOn!==0&&CFG.vipOn!==0}
-function gdHas(g,st){return gdOn()&&vipLevel(st||S)>=g.lv}
+/* admins get every spirit (teacher's request) */
+function gdHas(g,st){return gdOn()&&(((!st||st===S)&&CL.admin)||vipLevel(st||S)>=g.lv)}
 /* the spirit following the player: the chosen one if unlocked, else the strongest unlocked; 'none' hides it */
 function gdCur(){if(!gdOn()||!S.created)return null;var c=S.set.gd;if(c==='none')return null;if(GD[c]&&gdHas(GD[c]))return GD[c];var best=null;GD_LIST.forEach(function(g){if(gdHas(g))best=g});return best}
 function gdSvg(g,inside){var M=MON[g.mon];if(!M)return '';var h=inside?74:104,w=h*M.w/M.h;if(w>h*1.1){h=h*h*1.1/w;w=h*M.w/M.h}

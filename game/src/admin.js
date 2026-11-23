@@ -266,7 +266,9 @@ function verCtx(){var ids={};(CONTENT.daily||[]).forEach(function(d){ids[d.id]=1
   return {cfgs:function(t){return histCands('config','config',t).filter(Boolean).map(cleanConfig)},
     ent:function(col,id,t){return histCands(col,id,t).map(function(v){return v?cleanDoc(col,v,id):null})},
     dailyIds:function(t){return [t,t-6e5,t+6e5].map(function(tt){return Object.keys(ids).filter(function(id){return histCands('daily',id,tt)[0]})})},
-    raids:typeof RD!=='undefined'?RD.ver:{},items:itemsNow()}}
+    raids:typeof RD!=='undefined'?RD.ver:{},items:itemsNow(),admins:verAdmins()}}
+/* who is an admin (their guardian spirits need no top-up) */
+function verAdmins(){var l=[];if(CL.admin&&CL.uid)l.push(CL.uid);if(typeof SL!=='undefined'){if(SL.admins)l=l.concat(SL.admins);else if(typeof slOn==='function'&&slOn()&&window.TLQ_AUTH&&window.TLQ_AUTH.listAdmins){SL.admins=[];window.TLQ_AUTH.listAdmins().then(function(x){SL.admins=x;softRender()},function(){})}}return l}
 function verifyAll(){if(!CL.players)return;if(typeof rdLoadVer==='function')rdLoadVer();CL.players.forEach(function(p){verifyOne(p)});crossTrades()}
 /* trades span two ledgers: check each side against the other player's history */
 function crossTrades(){var EV={};(CL.players||[]).forEach(function(p){var ch=CL.chunks[p.id];if(ch&&ch.ck&&ch.ck!=='x')EV[p.id]=ch.events});

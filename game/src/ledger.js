@@ -322,9 +322,9 @@ function verifyLedger(o){var ev=o.events||[],ctx=o.ctx,issues=[],bad={},X=blankX
       var EVr=evBoss(e.rid),slotOk=EVr?(e.t>=EVr.start-60e3&&e.t<=EVr.start+EVr.hours*3600e3+15*60e3):cfgs.some(function(c){var sl=raidSlot(e.t,c);return sl.id===e.rid&&e.t>=sl.start&&e.t<=sl.end+15*60e3});if(!slotOk){add('err',e,'raidtime');break}
       var had=(X.raid&&X.raid[e.rid])?X.raid[e.rid].n:0;if(!cfgs.some(function(c){return had+e.n<=bossCfg(e.rid,c).q})){add('err',e,'raidcap');break}
       if(e.su||e.sb){var su=Array.isArray(e.su)?e.su:[],prevSu=(X.raid&&X.raid[e.rid]&&X.raid[e.rid].su)||[],cap=0,okSu=su.every(function(id,i){return SK_DEF[id]&&skLv(X,id,e.t)>0&&su.indexOf(id)===i&&prevSu.indexOf(id)<0});su.forEach(function(id){cap+=skMaxBonus(id,skLv(X,id,e.t),e.t)});
-        if(!okSu||!((e.sb|0)>=0)||(e.sb|0)>Math.min(cap,skOld(e.t)?14:SK_SBMAX)){add('err',e,'skill');break}}
+        if(!okSu||!((e.sb|0)>=0)||(e.sb|0)>Math.min(cap,skOld(e.t)?14:SK_SBMAX)||(!skOld(e.t)&&su.length>(e.ok|0))){add('err',e,'skill');break}}
       if(e.gd!==undefined){var gv=e.gd;if(!(typeof gv==='number'&&gv===(gv|0)&&gv>=0)||!cfgs.some(function(c){return gv<=e.ok*gdDmg(c)})){add('err',e,'gd');break}
-        if(gv>0){var gdB=adj.filter(function(a){return a.src==='topup'&&int(a.t,0,9e15)<=e.t+6e5}).reduce(function(s,a){return s+int(a.baht,0,1e6,0)},0);if(!cfgs.some(function(c){return gdB>=vipNeed(c,3)})){add('err',e,'gdvip','฿'+gdB);break}}}
+        if(gv>0){var gdB=adj.filter(function(a){return a.src==='topup'&&int(a.t,0,9e15)<=e.t+6e5}).reduce(function(s,a){return s+int(a.baht,0,1e6,0)},0);if(!cfgs.some(function(c){return gdB>=vipNeed(c,3)})&&(ctx.admins||[]).indexOf(o.uid)<0){add('err',e,'gdvip','฿'+gdB);break}}}
       var pfull=raidPenFull(e.rid,e.n,e.ok),pp=e.pen|0;if(pp<0||pp>pfull||(pp<pfull&&X.coin+(adjSum.coin|0)>=pfull)){add('err',e,'pen');break}
       if(!okR(function(c){return raidR(e.ok,c)}))add('err',e,'reward');if(!okLu())add('err',e,'level');break;
     case 'raidwin':if(typeof e.rid!=='string'||RAID_RARS.indexOf(e.tier)<0){add('err',e,'shape');break}

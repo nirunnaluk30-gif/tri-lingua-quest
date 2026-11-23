@@ -25,6 +25,7 @@ Object.assign(L,{
  sk2_streak:m('{n} ข้อถัดไป ถ้าถูก ข้อละ +{k}','+{k} on each of the next {n} right answers','接下来{n}题答对各 +{k}'),sk2_combo:m('ถูกติดกัน {n} ข้อ +{k}','{n} right in a row: +{k}','连续答对{n}题 +{k}'),
  sk2_rest:m('ทุกข้อที่ถูกจนจบรอบ +1 (สูงสุด {n})','+1 on every right answer to the end (up to {n})','之后每答对一题 +1(最多{n})'),sk2_double:m('ดาเมจข้อนั้น ×2','that hit counts twice','该次伤害 ×2'),
  sk2_shield:m('ตอบผิดได้ตอบใหม่ {n} ครั้ง','{n} retry after a wrong answer','答错可重答{n}次'),sk2_cut:m('ตัดตัวเลือกผิด {n} ตัว','removes {n} wrong option(s)','去掉{n}个错误选项'),sk2_hint:m('คำใบ้ {n} ข้อ','a hint on {n} question(s)','{n}题提示'),
+ sk2_charge:m('ตอบถูก 1 ข้อก่อน แล้วจึงใช้สกิลได้','Answer one right first to charge a skill','先答对一题才能使用技能'),sk2_ready:m('⚡ สกิลพร้อมใช้ 1 ครั้ง','⚡ One skill charged','⚡ 已充能1次'),sk2_wait:m('🔋 ตอบถูกเพื่อชาร์จสกิล','🔋 Answer right to charge a skill','🔋 答对即可充能'),
  sk2_nobr:m('ยังไม่ได้เลือกสาย','No branch picked yet','尚未选择分支')});
 var SK_TID={sword:[['sw1'],['swa1','sw2'],['swa2','swb2'],['swa3','swb3'],['sw3','swb4'],['swa5','swb5']],mage:[['mg1'],['mg2','mgb1'],['mga2','mgb2'],['mga3','mgb3'],['mg3','mgb4'],['mga5','mgb5']],archer:[['ar1'],['ar2','arb1'],['ara2','arb2'],['ara3','arb3'],['ar3','arb4'],['ara5','arb5']]};
 /* skills that fight now: base + the picked branch at each tier */
@@ -70,9 +71,9 @@ function skApply(s,id,lv,tunnel){var x=SK_DEF[id].x||{},f=s.fx;
    if(x.combo)f.combo={id:id,got:0,need:x.combo[0],bonus:x.combo[1]};if(x.rest)f.rest=(f.rest|0)+x.rest}
   if(x.shield){f.shield=f.shield||{left:0,cut:0};f.shield.left+=x.shield}
   var cut=(x.cut|0)+(tunnel&&!x.cut&&!x.shield&&!x.hint?1:0);if(cut)skCut(s,cut);if(x.hint){f.hintQ=Math.max(f.hintQ|0,x.hint);s.hint[s.i]=1;f.hintQ--}}
-skUse=function(id){var s=RD.enc;if(!s||s.picked!==null)return;var lv=skCurLv(id);if(!lv||SK_DEF[id].cls!==S.cls||skList(S.cls).indexOf(id)<0||skUsedFor(s.rid).indexOf(id)>=0)return;
-  s.fx=s.fx||{};s.hid=s.hid||{};s.hint=s.hint||{};s.su.push(id);skApply(s,id,lv,false);sfx('lvl');render();skFxPlay(id)};
-skAfterAnswer=function(s,ok){var f=s.fx||{},Q=skQ(s),bonus=Q.length?Q.shift():0;if(!ok)bonus=0;
+skUse=function(id){var s=RD.enc;if(!s||s.picked!==null)return;if(!(s.chg>0)){toast(t('sk2_charge'));return}var lv=skCurLv(id);if(!lv||SK_DEF[id].cls!==S.cls||skList(S.cls).indexOf(id)<0||skUsedFor(s.rid).indexOf(id)>=0)return;
+  s.chg--;s.fx=s.fx||{};s.hid=s.hid||{};s.hint=s.hint||{};s.su.push(id);skApply(s,id,lv,false);sfx('lvl');render();skFxPlay(id)};
+skAfterAnswer=function(s,ok){if(ok)s.chg=1;var f=s.fx||{},Q=skQ(s),bonus=Q.length?Q.shift():0;if(!ok)bonus=0;
   if(ok){if(f.combo){f.combo.got++;if(f.combo.got>=f.combo.need){bonus+=f.combo.bonus;f.combo=null}}if(f.rest>0){bonus+=1;f.rest--}}else if(f.combo)f.combo=null;
   if(bonus){var cap=s.su.reduce(function(a,id){return a+skMaxBonus(id,skCurLv(id))},0);bonus=Math.max(0,Math.min(bonus,Math.min(cap,SK_SBMAX)-s.sb))}
   s.sb+=bonus;s.pop=ok?1+bonus:0;if(ok&&bonus)skFxHit(bonus)};
@@ -81,8 +82,8 @@ skActive=function(s){var f=s.fx||{},a=[],Q=f.Q||[],up=Q.reduce(function(x,y){ret
   return a.length?'<small class="sk-act">'+esc(a.join(' · '))+'</small>':''};
 skVfx=function(){return ''};
 skTnDesc=function(id,lv){return skDesc(id,lv)};
-skTnUse=function(id){var s=TN.enc;if(!skTnOk(s)||s.picked!==null)return;var lv=skCurLv(id);if(!lv||SK_DEF[id].cls!==S.cls||skList(S.cls).indexOf(id)<0||(s.su||[]).indexOf(id)>=0||skTnCd(id)>0)return;
-  s.fx=s.fx||{};s.su=s.su||[];s.hid=s.hid||{};s.hint=s.hint||{};s.su.push(id);skApply(s,id,lv,true);sfx('lvl');render();skFxPlay(id)};
+skTnUse=function(id){var s=TN.enc;if(!skTnOk(s)||s.picked!==null)return;if(!(s.chg>0)){toast(t('sk2_charge'));return}var lv=skCurLv(id);if(!lv||SK_DEF[id].cls!==S.cls||skList(S.cls).indexOf(id)<0||(s.su||[]).indexOf(id)>=0||skTnCd(id)>0)return;
+  s.chg--;s.fx=s.fx||{};s.su=s.su||[];s.hid=s.hid||{};s.hint=s.hint||{};s.su.push(id);skApply(s,id,lv,true);sfx('lvl');render();skFxPlay(id)};
 /* ---------- particle effects ---------- */
 var SKFX={cv:null,g:null,P:[],F:[],tr:0,stop:0,last:0,clock:0,run:false,GL:{}};
 function skMotion(){return S.set.motion!==false&&!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)}
@@ -193,3 +194,9 @@ function skFxPlay(id){var d=SK_DEF[id],t=d.t,r=SK_RECIPE[id];if(!r)return;skCanv
 function skFxHit(n){if(!skMotion())return;var B=skBoss();skCanvas();skBurst(B.x,B.y,SKC[S.cls]||'#fff',8+n*2,320);skShock(B.x,B.y,SKC[S.cls]||'#fff',60+n*6,.4,6)}
 
 var SK_BAR0=skBar;skBar=function(s){var h=SK_BAR0(s),T=SK_TID[S.cls]||[],need=T.some(function(r,ti){return ti&&S.lvl>=SK_TIERS[ti]&&!(S.skb||{})[ti]});return need?h.replace(/<\/div>$/,'<small class="sk-act">🌟 '+esc(t('sk2_choose'))+'</small></div>'):h};
+
+/* a skill needs a right answer first: one charge per right answer, at most one waiting */
+function skChargeBar(h,s,act){var ok=s&&s.chg>0;if(!ok)h=h.replace(new RegExp('data-act="'+act+'"([^>]*)>','g'),function(m0,a){return a.indexOf('disabled')>=0?m0:'data-act="'+act+'"'+a+' disabled>'});return h.replace(/<\/div>$/,'<small class="sk-act">'+esc(t(ok?'sk2_ready':'sk2_wait'))+'</small></div>')}
+var SK_BAR1=skBar;skBar=function(s){return skChargeBar(SK_BAR1(s),s,'skuse')};
+var SK_TNB=skTnBar;skTnBar=function(s){return skChargeBar(SK_TNB(s),s,'sktnuse')};
+(function(){var A=tnAnswer;tnAnswer=function(idx){var s=TN.enc,q=s&&s.qs&&s.qs[s.i];var before=s&&s.picked;A(idx);if(s&&q&&before===null&&s.picked!==null&&s.lastOk)s.chg=1}})();
