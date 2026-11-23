@@ -1,0 +1,37 @@
+const { chromium } = require('playwright');
+const MOCK = require('./mock.js');
+const URL = 'file:///home/claude/trilingua/index.html';
+(async () => {
+  const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] });
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const results = [], errors = []; const check = (n, ok, info) => results.push((ok ? 'PASS ' : 'FAIL ') + n + (info ? ' — ' + info : ''));
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  async function open(role, uid, vp) { const p = await (vp ? (await browser.newContext({ viewport: vp })) : ctx).newPage(); p.on('pageerror', e => errors.push(uid + ': ' + e.message)); await p.addInitScript(MOCK(role, uid)); await p.goto(URL); await wait(300); return p; }
+  const db = P => P.evaluate(() => JSON.parse(localStorage.getItem('__mockdb')));
+  try {
+  const A = await open('admin', 'u_admin'); await A.evaluate(() => localStorage.clear()); await A.reload(); await wait(400);
+  await A.click('[data-act=go][data-id=admin]'); await A.click('[data-act=admseed][data-id=all]'); await wait(40000);
+  const P = await open('student', 'u_stu'); await wait(800); await P.click('[data-act=newgame]'); await P.fill('#hname', 'Ploy'); await P.click('[data-act=confirmcreate]'); await wait(2000);
+  const Q = await open('student', 'u_two'); await wait(800); await Q.click('[data-act=newgame]'); await Q.fill('#hname', 'Beam'); await Q.click('[data-act=confirmcreate]'); await wait(2000);
+  await A.click('[data-act=admtab][data-id=topup]'); await wait(400);
+  await A.check('#wl_en'); await A.fill('#wl_a', '080-000-0000'); await A.fill('#wl_n', 'Test'); await A.fill('#wl_p', '50,20,0'); await A.click('[data-act=admwlsave]'); await wait(1200);
+  const goTop = async (X) => { await X.evaluate(() => document.querySelector('nav [data-id=home]').click()); await X.evaluate(() => document.querySelector('nav [data-id=shop]').click()); await X.click('[data-act=shoptab][data-id=topup]'); await wait(400) };
+  await goTop(P);
+  check('promo card shown with ฿29', !!(await P.$('.tp-promo')) && /฿29/.test(await P.innerText('.tp-promo')), (await P.innerText('.tp-promo').catch(()=>'')).replace(/\n/g,' | '));
+  await P.locator('.tp-promo').screenshot({ path: 'promo.png' });
+  await P.click('[data-act=tppack][data-id=pr1]'); await wait(200);
+  check('amount says ฿29 and gift line shows box + tickets + title', /฿29/.test(await P.innerText('.tp-pay')) && /🎟️ 50/.test(await P.innerText('.tp-pay')));
+  await P.fill('#tp_ref', '10:05'); await P.check('input[name=tp_age][value=adult]'); await P.click('[data-act=tpsend]'); await wait(1200);
+  let d = await db(P); const r = d['topup/u_stu'].reqs.slice(-1)[0]; check('request is for the promo at ฿29', r.pack === 'pr1' && r.price === 29, JSON.stringify({ p: r.pack, pr: r.price }));
+  const t0 = await P.evaluate(() => window.__TLQ.S().tickets);
+  await A.click('[data-act=admtab][data-id=overview]'); await wait(200); await A.click('[data-act=admtab][data-id=topup]'); await wait(800);
+  const id = await A.evaluate(() => { const b = [...document.querySelectorAll('[data-act=admwlok]')].find(x => x.dataset.id.startsWith('u_stu|')); return b && b.dataset.id }); await A.click(`[data-act=admwlok][data-id="${id}"]`); await wait(3000);
+  const st = await P.evaluate(() => { const S = window.__TLQ.S(), I = window.__TLQ.ITEM(); const cel = Object.keys(S.owned).filter(k => I[k] && I[k].rar === 'celestial'); return { tk: S.tickets, cel, tt: S.tta } });
+  check('student gets 10 tickets, 1 celestial item and the title', st.tk === t0 + 50 && st.cel.length === 1 && st.tt && !!st.tt.tpr1, JSON.stringify(st));
+  await goTop(P); check('promo now marked as mine; cannot buy again', /ได้รับแล้ว|ของฉัน/.test(await P.innerText('.tp-promo')) && !(await P.$('.tp-promo [data-act=tppack]')), (await P.innerText('.tp-promo')).replace(/\n/g,' | ').slice(-120));
+  await wait(2000); await A.click('[data-act=admtab][data-id=players]'); await wait(3000);
+  const v = await A.evaluate(() => { const r = window.__TLQ.CL.ver['u_stu']; return r && r.res ? { errs: r.res.errs, msgs: r.res.issues.map(x => x.msg).join(',') } : null });
+  check('teacher verification clean', v && v.errs === 0, JSON.stringify(v));
+  } catch (e) { check('exception ' + e.message, false) }
+  results.forEach(r => console.log(r)); errors.forEach(e => console.log('PAGEERR ' + e)); await browser.close();
+})();

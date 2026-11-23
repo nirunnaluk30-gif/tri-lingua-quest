@@ -1,0 +1,7 @@
+game/web/
+game/index.html
+game/assets/
+node_modules/
+__pycache__/
+*.png
+!references/bosses/*.png
