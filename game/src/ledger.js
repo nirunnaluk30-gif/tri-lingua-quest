@@ -139,11 +139,28 @@ function treqKey(e){return e.tid+'@'+e.from}
 /* market rules: 5% stall fee on coin sales (recorded in the tdone event), price range per rarity, 6 open offers per stall */
 /* skills: 3 per class, unlocked by level, upgraded to Lv5 with coins. In boss fights each skill works once per boss;
    attack skills add bonus damage (e.sb) that may not exceed what the used skills (e.su) allow at their level. */
-var SK_DEF={sw1:{cls:'sword',u:5,k:'atk'},sw2:{cls:'sword',u:15,k:'def'},sw3:{cls:'sword',u:30,k:'ult'},mg1:{cls:'mage',u:5,k:'ctl'},mg2:{cls:'mage',u:15,k:'atk'},mg3:{cls:'mage',u:30,k:'ult'},ar1:{cls:'archer',u:5,k:'ctl'},ar2:{cls:'archer',u:15,k:'atk'},ar3:{cls:'archer',u:30,k:'ult'}};
-var SK_COST=[0,0,500,1500,4000,10000],SK_SBMAX=14;
-function skLv(X,id){var d=SK_DEF[id];if(!d||(X.lvl|0)<d.u)return 0;return Math.min(5,Math.max(1,(X.sk&&X.sk[id])|0))}
-function skReq(id,lv){return SK_DEF[id].u+(lv-1)*5}
-function skMaxBonus(id,lv){if(!lv)return 0;switch(id){case 'sw1':return [0,1,1,2,2,3][lv];case 'sw3':return lv>=5?8:lv>=4?6:3;case 'mg2':return [0,2,2,3,3,4][lv];case 'mg3':return lv>=5?9:lv>=4?6:4;case 'ar2':return [0,2,2,3,3,4][lv];case 'ar3':return [0,3,3,4,4,5][lv]}return 0}
+/* SKILL TREES v2 (from 24 Nov 2026 Bangkok): per class a base skill at level 5, then at 15 / 25 / 35 / 40 / 60
+   the player picks branch A or B (event 'skbr'; first pick free, a change costs SK_BRCOST once a Thai week).
+   Every skill deals damage (d, +1 at Lv3 and Lv5) and has its own extra (x). The old 9 skills sit inside the trees;
+   events from before SK_V2_T keep the old rules (old unlock levels, old caps). */
+var SK_V2_T=Date.UTC(2026,10,23,17,0),SK_TIERS=[5,15,25,35,40,60],SK_BRCOST=500;
+function skT(id,d){return {cls:d[0],u:SK_TIERS[d[1]],t:d[1],b:d[2],k:d[3],d:d[4],x:d[5]}}
+var SK_DEF={};(function(){var R={
+ sw1:['sword',0,'','atk',2,{pierce:1}],swa1:['sword',1,'A','atk',3,{pierce:2}],swa2:['sword',2,'A','atk',4,{burn:2}],swa3:['sword',3,'A','atk',5,{combo:[2,3]}],sw3:['sword',4,'A','ult',6,{streak:[3,2]}],swa5:['sword',5,'A','ult',10,{rest:5}],
+ sw2:['sword',1,'B','def',2,{shield:1}],swb2:['sword',2,'B','def',3,{cut:1}],swb3:['sword',3,'B','def',4,{shield:1,pierce:2}],swb4:['sword',4,'B','def',5,{shield:2}],swb5:['sword',5,'B','ult',8,{shield:3}],
+ mg1:['mage',0,'','ctl',2,{cut:1}],mg2:['mage',1,'A','atk',4,{}],mga2:['mage',2,'A','atk',4,{streak:[2,1]}],mga3:['mage',3,'A','atk',5,{burn:3}],mg3:['mage',4,'A','ult',6,{streak:[3,1]}],mga5:['mage',5,'A','ult',10,{double:1}],
+ mgb1:['mage',1,'B','ctl',2,{hint:1}],mgb2:['mage',2,'B','ctl',3,{hint:2}],mgb3:['mage',3,'B','ctl',4,{cut:2}],mgb4:['mage',4,'B','ctl',5,{cut:2,shield:1}],mgb5:['mage',5,'B','ult',8,{hint:3,cut:1}],
+ ar1:['archer',0,'','ctl',2,{hint:1}],ar2:['archer',1,'A','atk',3,{combo:[3,3]}],ara2:['archer',2,'A','atk',4,{burn:2}],ara3:['archer',3,'A','atk',5,{combo:[2,3]}],ar3:['archer',4,'A','ult',6,{pierce:4}],ara5:['archer',5,'A','ult',10,{rest:5}],
+ arb1:['archer',1,'B','ctl',2,{cut:2}],arb2:['archer',2,'B','ctl',3,{hint:2}],arb3:['archer',3,'B','def',4,{shield:1}],arb4:['archer',4,'B','def',5,{shield:1,hint:1}],arb5:['archer',5,'B','ult',8,{shield:2,hint:3}]};
+ Object.keys(R).forEach(function(id){SK_DEF[id]=skT(id,R[id])});SK_DEF.sw3.u0=30;SK_DEF.mg3.u0=30;SK_DEF.ar3.u0=30})();
+var SK_COST=[0,0,500,1500,4000,10000],SK_SBMAX=40;
+function skOld(t){return t!=null&&t<SK_V2_T}
+function skU(id,t){var d=SK_DEF[id];return skOld(t)&&d.u0?d.u0:d.u}
+function skLv(X,id,t){var d=SK_DEF[id];if(!d||(X.lvl|0)<skU(id,t))return 0;if(!skOld(t)&&d.b&&((X.skb||{})[d.t])!==d.b)return 0;if(skOld(t)&&['sw1','sw2','sw3','mg1','mg2','mg3','ar1','ar2','ar3'].indexOf(id)<0)return 0;return Math.min(5,Math.max(1,(X.sk&&X.sk[id])|0))}
+function skReq(id,lv,t){return Math.min(skOld(t)?999:60,skU(id,t)+(lv-1)*5)}
+function skDmg(id,lv){var d=SK_DEF[id];return lv?d.d+(lv>=3?1:0)+(lv>=5?1:0):0}
+function skMaxBonus(id,lv,t){if(!lv)return 0;if(skOld(t))return skMaxBonus0(id,lv);var x=SK_DEF[id].x,b=skDmg(id,lv);if(x.pierce)b+=x.pierce;if(x.burn)b+=x.burn;if(x.streak)b+=x.streak[0]*x.streak[1];if(x.combo)b+=x.combo[1];if(x.rest)b+=x.rest;if(x.double)b+=skDmg(id,lv);return b}
+function skMaxBonus0(id,lv){if(!lv)return 0;switch(id){case 'sw1':return [0,1,1,2,2,3][lv];case 'sw3':return lv>=5?8:lv>=4?6:3;case 'mg2':return [0,2,2,3,3,4][lv];case 'mg3':return lv>=5?9:lv>=4?6:4;case 'ar2':return [0,2,2,3,3,4][lv];case 'ar3':return [0,3,3,4,4,5][lv]}return 0}
 var MK_FEE=5,MK_MAXOPEN=6,MK_RANGE={common:[10,300],uncommon:[20,800],rare:[50,2000],epic:[120,5000],legendary:[300,15000],mythic:[600,40000],celestial:[1200,100000]};
 function mkFee(pay){pay=cleanPay(pay);return pay.item?0:Math.ceil(pay.coin*MK_FEE/100)}
 function mkRange(it){return (it&&MK_RANGE[it.rar])||[1,1e7]}
@@ -178,6 +195,7 @@ function applyEvent(X,e){switch(e.k){
   case 'raid':dayOf(X,e.d);X.daily.p.correct+=e.ok;applyWords(X,e);applyGrant(X,e.r,e.lu);if(!X.raid)X.raid={};var rr=X.raid[e.rid]||{n:0,ok:0};rr.n+=e.n;rr.ok+=e.ok;if(e.sb>0)rr.sb=(rr.sb|0)+(e.sb|0);if(e.gd>0)rr.gd=(rr.gd|0)+(e.gd|0);if(Array.isArray(e.su)&&e.su.length)rr.su=(rr.su||[]).concat(e.su);X.raid[e.rid]=rr;if(e.pen>0)X.coin-=e.pen|0;break;
   case 'alvl':X.lvl=Math.min(999,(X.lvl|0)+(e.n|0));break;
   case 'skup':X.coin-=e.cost|0;if(!X.sk)X.sk={};X.sk[e.sk]=e.lv|0;break;
+  case 'skbr':X.coin-=e.cost|0;if(!X.skb)X.skb={};X.skb[e.t2|0]=e.b;if((e.cost|0)>0)X.skbw=bkkWeek(e.t);break;
   case 'raidwin':if(!X.raidw)X.raidw={};X.raidw[e.rid]=e.tier||1;X.rw=(X.rw||0)+1;if(e.item)addOwn(X,e.item);applyGrant(X,e.r,e.lu);break;
   case 'eva':X.tickets+=EVA.tk;if(!X.eva)X.eva={};X.eva[e.day]=1;break;
   case 'pbg':X.coin-=e.price;if(!X.pbg)X.pbg={};X.pbg[e.id]=1;break;
@@ -303,8 +321,8 @@ function verifyLedger(o){var ev=o.events||[],ctx=o.ctx,issues=[],bad={},X=blankX
     case 'raid':if(!(e.n>=1&&e.n<=50)||e.ok<0||e.ok>e.n||typeof e.rid!=='string'){add('err',e,'shape');break}
       var EVr=evBoss(e.rid),slotOk=EVr?(e.t>=EVr.start-60e3&&e.t<=EVr.start+EVr.hours*3600e3+15*60e3):cfgs.some(function(c){var sl=raidSlot(e.t,c);return sl.id===e.rid&&e.t>=sl.start&&e.t<=sl.end+15*60e3});if(!slotOk){add('err',e,'raidtime');break}
       var had=(X.raid&&X.raid[e.rid])?X.raid[e.rid].n:0;if(!cfgs.some(function(c){return had+e.n<=bossCfg(e.rid,c).q})){add('err',e,'raidcap');break}
-      if(e.su||e.sb){var su=Array.isArray(e.su)?e.su:[],prevSu=(X.raid&&X.raid[e.rid]&&X.raid[e.rid].su)||[],cap=0,okSu=su.every(function(id,i){return SK_DEF[id]&&skLv(X,id)>0&&su.indexOf(id)===i&&prevSu.indexOf(id)<0});su.forEach(function(id){cap+=skMaxBonus(id,skLv(X,id))});
-        if(!okSu||!((e.sb|0)>=0)||(e.sb|0)>Math.min(cap,SK_SBMAX)){add('err',e,'skill');break}}
+      if(e.su||e.sb){var su=Array.isArray(e.su)?e.su:[],prevSu=(X.raid&&X.raid[e.rid]&&X.raid[e.rid].su)||[],cap=0,okSu=su.every(function(id,i){return SK_DEF[id]&&skLv(X,id,e.t)>0&&su.indexOf(id)===i&&prevSu.indexOf(id)<0});su.forEach(function(id){cap+=skMaxBonus(id,skLv(X,id,e.t),e.t)});
+        if(!okSu||!((e.sb|0)>=0)||(e.sb|0)>Math.min(cap,skOld(e.t)?14:SK_SBMAX)){add('err',e,'skill');break}}
       if(e.gd!==undefined){var gv=e.gd;if(!(typeof gv==='number'&&gv===(gv|0)&&gv>=0)||!cfgs.some(function(c){return gv<=e.ok*gdDmg(c)})){add('err',e,'gd');break}
         if(gv>0){var gdB=adj.filter(function(a){return a.src==='topup'&&int(a.t,0,9e15)<=e.t+6e5}).reduce(function(s,a){return s+int(a.baht,0,1e6,0)},0);if(!cfgs.some(function(c){return gdB>=vipNeed(c,3)})){add('err',e,'gdvip','฿'+gdB);break}}}
       var pfull=raidPenFull(e.rid,e.n,e.ok),pp=e.pen|0;if(pp<0||pp>pfull||(pp<pfull&&X.coin+(adjSum.coin|0)>=pfull)){add('err',e,'pen');break}
@@ -357,7 +375,8 @@ function verifyLedger(o){var ev=o.events||[],ctx=o.ctx,issues=[],bad={},X=blankX
       var ps=ctx.ent('shop',e.sh+'_'+e.item,e.t).filter(Boolean).concat((CONTENT.shop||[]).filter(function(x){return x.item===e.item&&x.kind===e.sh}));
       if(!ps.length){add('err',e,'unknown');break}var minP=Math.min.apply(null,ps.map(function(x){return x.price}));
       if(!(e.price>=minP))add('err',e,'price');else if(!ps.some(function(x){return x.price===e.price}))add('warn',e,'pricechg');break;
-    case 'skup':if(!SK_DEF[e.sk]||(e.lv|0)!==skLv(X,e.sk)+1||e.lv>5||(X.lvl|0)<skReq(e.sk,e.lv)||(e.cost|0)!==SK_COST[e.lv]){add('err',e,'skill');break}break;
+    case 'skup':if(!SK_DEF[e.sk]||(e.lv|0)!==skLv(X,e.sk,e.t)+1||e.lv>5||(X.lvl|0)<skReq(e.sk,e.lv,e.t)||(e.cost|0)!==SK_COST[e.lv]){add('err',e,'skill');break}break;
+    case 'skbr':var sbt=e.t2|0,sbo=(X.skb||{})[sbt];if(skOld(e.t)||!(sbt>=1&&sbt<=5)||(e.b!=='A'&&e.b!=='B')||sbo===e.b||(X.lvl|0)<SK_TIERS[sbt]||(e.cost|0)!==(sbo?SK_BRCOST:0)||(sbo&&X.skbw===bkkWeek(e.t))){add('err',e,'skill');break}break;
     case 'ex':if(!(e.n>=1)||(e.to!=='gems'&&e.to!=='tickets')){add('err',e,'shape');break}
       if(!cfgs.some(function(c){return c.exOn!==0&&exCost(e.to,e.n,c)===e.cost})){add('err',e,'exrate');break}
       if(!cfgs.some(function(c){var X2=JSON.parse(JSON.stringify(X.ex||{}));var tmp={ex:X2};return exRoom(tmp,e.to,e.d,c)>=e.n}))add('err',e,'excap');break;
@@ -415,7 +434,8 @@ function rebuildLedger(o){var usedL={},out=[],X=blankX(),prevH='',ctx=o.ctx,adj=
       if(run.items.some(function(x){return !x}))return;e.items=run.items;e.rr=run.rr;e.gc=run.gc;e.sd='u';break;
     case 'buy':var sp=e.ds?(ctx.items[e.item]&&dsPrice(ctx.items[e.item],e.sh,c)?{price:dsPrice(ctx.items[e.item],e.sh,c)}:null):ctx.ent('shop',e.sh+'_'+e.item,e.t).filter(Boolean)[0]||(CONTENT.shop||[]).filter(function(x){return x.item===e.item&&x.kind===e.sh})[0];if(!sp)return;e.price=sp.price;
       if(X[e.sh==='gem'?'gems':'coin']+adj[e.sh==='gem'?'gems':'coin']<e.price)return;if(e.sh==='gem'){e.pp=Math.min(int(e.pp,0,1e6,0),paidLeft,e.price);paidLeft-=e.pp;if(!e.pp)delete e.pp}break;
-    case 'skup':if(!SK_DEF[e.sk]||(e.lv|0)!==skLv(X,e.sk)+1||X.coin+adj.coin<e.cost)return;break;
+    case 'skup':if(!SK_DEF[e.sk]||(e.lv|0)!==skLv(X,e.sk,e.t)+1||X.coin+adj.coin<e.cost)return;break;
+    case 'skbr':if(!(e.t2>=1&&e.t2<=5)||(e.b!=='A'&&e.b!=='B')||((X.skb||{})[e.t2])===e.b||X.coin+adj.coin<(e.cost|0))return;break;
     case 'alvl':if(!(adj.lv&&adj.lv[e.aid]===e.n)||usedL[e.aid])return;usedL[e.aid]=1;break;
     case 'ex':if(!(e.n>=1)||c.exOn===0||exRoom(X,e.to,e.d,c)<e.n)return;e.cost=exCost(e.to,e.n,c);if(e.to==='gems'?X.coin+adj.coin<e.cost:X.gems+adj.gems<e.cost)return;break;
     case 'sell':if(!(e.n>=1)||own(e.item)<e.n||!ctx.items[e.item])return;e.price=sellPrice(ctx.items[e.item],c);break;

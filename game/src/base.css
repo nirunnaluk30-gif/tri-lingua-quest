@@ -1092,3 +1092,21 @@ html.no-motion .sk-vfx,html.no-motion .sk-pop{display:none}
 .gd-vip{position:absolute;top:6px;left:6px;font-size:11px;font-weight:800;background:#d9a521;color:#2a1a00;border-radius:99px;padding:1px 7px}
 html.no-motion .av-gd *{animation:none!important}
 @media (prefers-reduced-motion:reduce){.av-gd .av-gdb{animation:none}}
+
+/* skill trees v2 + particle layer */
+.sk-canvas{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:9000}
+.sk-cutin{position:fixed;left:-10%;right:-10%;top:32%;height:22vh;min-height:110px;transform:skewY(-6deg);background:linear-gradient(90deg,#0000,var(--c) 18%,var(--c) 82%,#0000);display:flex;align-items:center;justify-content:center;gap:16px;z-index:9001;color:#fff;pointer-events:none;animation:skcut 1.1s cubic-bezier(.2,.8,.2,1) forwards}
+.sk-cutin.gold{background:linear-gradient(90deg,#0000,#2a1a00 15%,#5a3a06 50%,#2a1a00 85%,#0000);border-block:3px solid #f3c64a;box-shadow:0 0 30px #f3c64a88}
+.sk-cutin b{font-size:clamp(22px,4vw,40px);text-shadow:0 3px 0 #0006;display:block}.sk-cutin.gold b{color:#f3c64a}.sk-cutin small{font-size:13px;opacity:.9}
+.sk-cutav{display:block;height:150%;aspect-ratio:200/240}.sk-cutav svg{width:100%;height:100%}
+@keyframes skcut{0%{transform:translateX(-100%) skewY(-6deg);opacity:1}22%,78%{transform:translateX(0) skewY(-6deg);opacity:1}100%{transform:translateX(100%) skewY(-6deg);opacity:0}}
+.sk-lunge{animation:sklunge .3s ease-out}@keyframes sklunge{40%{transform:translateX(16px) scale(1.05)}}
+.sk-glow{filter:drop-shadow(0 0 12px #ffd76a) drop-shadow(0 0 26px #b48cff)}
+.sk-bosshit{animation:skbh .45s}@keyframes skbh{0%{filter:brightness(2.6) saturate(.2)}30%{transform:translateX(10px)}60%{transform:translateX(-6px)}100%{filter:none;transform:none}}
+.sk-tree{display:flex;flex-direction:column;gap:10px;max-height:62vh;overflow:auto;padding-right:4px}
+.sk-tier{border:1px solid var(--line);border-radius:14px;padding:8px}.sk-tierh{font-weight:800;font-size:13px;color:var(--muted,#888);margin:0 0 6px 4px}
+.sk-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:8px}
+.sk-brh{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-weight:800;font-size:14px;text-align:center}
+.sk-tree .sk-card{flex-wrap:wrap;align-items:flex-start}.sk-tree .sk-card>.stack{flex:1 1 150px}.sk-tree .sk-card>.btn,.sk-tree .sk-card>small,.sk-tree .sk-card>.tag{flex:1 1 100%;text-align:center}
+.sk-card.picked{box-shadow:0 0 0 2px #7a4dff66}.sk-card.god{background:linear-gradient(135deg,#fff4cf,transparent 70%);border-color:#d9a521}
+@media (prefers-reduced-motion:reduce){.sk-cutin,.sk-lunge,.sk-bosshit{animation:none}}
