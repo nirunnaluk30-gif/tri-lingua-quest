@@ -132,6 +132,21 @@ function applyWords(X,e){(e.wc||[]).forEach(function(w){X.wk[w]=(X.wk[w]||0)+1})
 /* market: what a trade asks for — coins, or n of one item (gems are never tradable) */
 function cleanPay(p){p=isO(p)?p:{};if(typeof p.item==='string'&&IDRE.test(p.item))return {item:p.item,n:int(p.n,1,1e4)};return {coin:int(p.coin,1,1e7)}}
 function samePay(a,b){return canon(cleanPay(a))===canon(cleanPay(b))}
+/* BAG, +UPGRADES AND COMBAT POWER (from 24 Nov 2026 20:00 Bangkok)
+   'salv' dismantles one owned item into upgrade stones; 'enh' upgrades an item +1 (to +20) with coins and stones.
+   +1..+10 always work; from +11 the chance drops 7% a step (30% at +20); a miss keeps the item and its level.
+   The roll is fixed by player, item and try number, so the teacher can redo it. Raids give 2 stones,
+   and combat power (best owned item per kind, upgrades included) adds up to +5 boss damage per right answer. */
+var ENH_T=Date.UTC(2026,10,24,13,0),ENH_P={common:10,uncommon:20,rare:40,epic:80,legendary:150,mythic:250,celestial:400},ENH_ST={common:1,uncommon:2,rare:4,epic:8,legendary:15,mythic:25,celestial:40};
+var ENH_NOCAT={title:1,haircolor:1,hairColor:1,frame:1};
+function enhChance(lv){return lv<=10?100:Math.max(30,100-(lv-10)*7)}
+function enhCoin(lv){return lv*200}
+function enhRoll(uid,id,n){return Math.floor(rng01(uid,'enh|'+id+'|'+n)*100)}
+function enhOk(uid,id,n,lv){return enhRoll(uid,id,n)<enhChance(lv)}
+function itemPow(it,lv){return it&&ENH_P[it.rar]?Math.round(ENH_P[it.rar]*(1+.08*(lv|0))):0}
+function cpBest(X,items,ownF,extra){var best={};Object.keys(X.owned||{}).concat(extra||[]).forEach(function(id){var it=items[id];if(!it||ENH_NOCAT[it.cat]||!((ownF?ownF(id):(X.owned[id]|0))>0))return;var p=itemPow(it,(X.enh||{})[id]),sk=typeof slotOf==='function'?slotOf(it):it.cat;if(p>(best[sk]||0))best[sk]=p});
+  return 10*Object.keys(best).reduce(function(a,k){return a+best[k]},0)}
+function cpBonus(cp){return Math.min(5,Math.floor((cp|0)/1000))}
 function subOwn(X,id,n){X.owned[id]=(X.owned[id]||0)-n;if(X.owned[id]===0)delete X.owned[id]}
 function payOut(X,p){p=cleanPay(p);if(p.item)subOwn(X,p.item,p.n);else X.coin-=p.coin}
 function payIn(X,p){p=cleanPay(p);if(p.item)addOwn(X,p.item,p.n);else X.coin+=p.coin}
@@ -170,7 +185,9 @@ function exCost(to,n,cfg){return n*(to==='gems'?cfg.exCoinGem:cfg.exGemTicket)}
 function exRoom(X,to,d,cfg){exDay(X,d);var cap=to==='gems'?cfg.exGemDay:cfg.exTicketDay;return cap?Math.max(0,cap-(to==='gems'?X.ex.g:X.ex.t)):1e6}
 function applyEvent(X,e){switch(e.k){
   case 'ex':exDay(X,e.d);if(e.to==='gems'){X.coin-=e.cost;X.gems+=e.n;X.ex.g+=e.n}else{X.gems-=e.cost;X.tickets+=e.n;X.ex.t+=e.n}break;
-  case 'sell':subOwn(X,e.item,e.n);X.coin+=e.price*e.n;break;
+  case 'sell':subOwn(X,e.item,e.n);X.coin+=e.price*e.n;if(!X.owned[e.item]&&X.enh)delete X.enh[e.item];break;
+  case 'salv':subOwn(X,e.item,1);X.st=(X.st|0)+(e.st|0);if(!X.owned[e.item]&&X.enh)delete X.enh[e.item];break;
+  case 'enh':X.coin-=e.cost|0;X.st=(X.st|0)-(e.sc|0);if(!X.enhn)X.enhn={};X.enhn[e.item]=(X.enhn[e.item]|0)+1;if(e.ok){if(!X.enh)X.enh={};X.enh[e.item]=e.lv|0}break;
   case 'discard':subOwn(X,e.item,e.n);break;
   case 'tout':subOwn(X,e.item,e.n);X.trades[e.tid]={item:e.item,n:e.n,want:cleanPay(e.want),to:e.to||'',st:'open',by:'',t:e.t};break;
   case 'tcancel':var tc=X.trades[e.tid];if(tc&&tc.st==='open'){addOwn(X,tc.item,tc.n);tc.st='cancel'}break;
@@ -192,7 +209,7 @@ function applyEvent(X,e){switch(e.k){
   case 'pull':X.tickets-=e.n;(e.items||[]).forEach(function(i){addOwn(X,i)});X.gacha[e.b]=Object.assign({},e.gc);X.stats.pulls+=e.n;break;
   case 'buy':X[e.sh==='gem'?'gems':'coin']-=e.price;addOwn(X,e.item);break;
   case 'tnmon':case 'tnboss':dayOf(X,e.d);X.daily.p.correct+=e.ok;applyWords(X,e);applyGrant(X,e.r,e.lu);tnApply(X,e);break;
-  case 'raid':dayOf(X,e.d);X.daily.p.correct+=e.ok;applyWords(X,e);applyGrant(X,e.r,e.lu);if(!X.raid)X.raid={};var rr=X.raid[e.rid]||{n:0,ok:0};rr.n+=e.n;rr.ok+=e.ok;if(e.sb>0)rr.sb=(rr.sb|0)+(e.sb|0);if(e.gd>0)rr.gd=(rr.gd|0)+(e.gd|0);if(Array.isArray(e.su)&&e.su.length)rr.su=(rr.su||[]).concat(e.su);X.raid[e.rid]=rr;if(e.pen>0)X.coin-=e.pen|0;break;
+  case 'raid':dayOf(X,e.d);X.daily.p.correct+=e.ok;applyWords(X,e);applyGrant(X,e.r,e.lu);if(!X.raid)X.raid={};var rr=X.raid[e.rid]||{n:0,ok:0};rr.n+=e.n;rr.ok+=e.ok;if(e.sb>0)rr.sb=(rr.sb|0)+(e.sb|0);if(e.gd>0)rr.gd=(rr.gd|0)+(e.gd|0);if(e.cb>0)rr.cb=(rr.cb|0)+(e.cb|0);if(e.st>0)X.st=(X.st|0)+(e.st|0);if(Array.isArray(e.su)&&e.su.length)rr.su=(rr.su||[]).concat(e.su);X.raid[e.rid]=rr;if(e.pen>0)X.coin-=e.pen|0;break;
   case 'alvl':X.lvl=Math.min(999,(X.lvl|0)+(e.n|0));break;
   case 'skup':X.coin-=e.cost|0;if(!X.sk)X.sk={};X.sk[e.sk]=e.lv|0;break;
   case 'skbr':X.coin-=e.cost|0;if(!X.skb)X.skb={};X.skb[e.t2|0]=e.b;if((e.cost|0)>0)X.skbw=bkkWeek(e.t);break;
@@ -256,7 +273,7 @@ var VMSG={seq:m('ลำดับประวัติขาดหาย','Histor
  first:m('ประวัติต้องเริ่มด้วยการสร้างตัวละคร','History must start with hero creation','记录必须从创建角色开始'),start:m('ของเริ่มต้นไม่ตรงกติกา','Starting items don\'t match the rules','初始物品不符合规则'),
  shape:m('ข้อมูลเหตุการณ์ผิดรูปแบบ','Malformed event','记录格式错误'),qn:m('จำนวนข้อไม่ตรงกติกา','Question count doesn\'t match the rules','题数不符'),stars:m('จำนวนดาวไม่ตรงคะแนน','Stars don\'t match the score','星数与得分不符'),
  reward:m('รางวัลไม่ตรงกติกา','Reward doesn\'t match the rules','奖励不符合规则'),level:m('การเลเวลอัปไม่ตรงกติกา','Level-up doesn\'t match the rules','升级不符合规则'),
-gd:m('ความแรงภูตพิทักษ์เกินกว่าที่ตั้งไว้','Guardian damage is more than allowed','守护灵伤害超出设定'),gdvip:m('ใช้ภูตพิทักษ์ทั้งที่ยอดเติมยังไม่ถึง VIP 3','Guardian used before reaching VIP 3','未达到 VIP 3 就使用守护灵'),bnend:m('สุ่มตู้ที่ปิดไปแล้ว','Summoned from a box that has closed','从已关闭的卡池召唤'), pen:m('เหรียญที่ถูกบอสกลืนไม่ตรงกับจำนวนข้อที่ตอบผิด','Coins eaten by the boss do not match the wrong answers','被首领吞掉的金币与答错题数不符'), eva:m('รับตั๋วเช็คชื่ออัตโนมัตินอกเวลา 19:00–20:00 หรือนอกช่วงกิจกรรม','Auto check-in tickets claimed outside 19:00–20:00 or outside the event days','在19:00–20:00或活动日期之外领取自动签到券'), skill:m('ใช้สกิลหรืออัปสกิลผิดเงื่อนไข','Skill used or upgraded against the rules','技能使用或升级不符合规则'), dup:m('รับรางวัลซ้ำ','Reward claimed twice','重复领取'),cond:m('รับรางวัลก่อนทำเงื่อนไขครบ','Claimed before meeting the condition','未达成条件就领取'),unknown:m('ไม่มีเควสต์/ไอเทมนี้ในระบบ','Quest or item doesn\'t exist','任务或道具不存在'),
+enh:m('ตีบวกหรือย่อยของไม่ตรงกติกา','Upgrade or dismantle breaks the rules','强化或分解不符合规则'),cp:m('ดาเมจจากพลังรบเกินกว่าของที่มี','Combat power damage is more than the gear allows','战力伤害超出装备允许'),gd:m('ความแรงภูตพิทักษ์เกินกว่าที่ตั้งไว้','Guardian damage is more than allowed','守护灵伤害超出设定'),gdvip:m('ใช้ภูตพิทักษ์ทั้งที่ยอดเติมยังไม่ถึง VIP 3','Guardian used before reaching VIP 3','未达到 VIP 3 就使用守护灵'),bnend:m('สุ่มตู้ที่ปิดไปแล้ว','Summoned from a box that has closed','从已关闭的卡池召唤'), pen:m('เหรียญที่ถูกบอสกลืนไม่ตรงกับจำนวนข้อที่ตอบผิด','Coins eaten by the boss do not match the wrong answers','被首领吞掉的金币与答错题数不符'), eva:m('รับตั๋วเช็คชื่ออัตโนมัตินอกเวลา 19:00–20:00 หรือนอกช่วงกิจกรรม','Auto check-in tickets claimed outside 19:00–20:00 or outside the event days','在19:00–20:00或活动日期之外领取自动签到券'), skill:m('ใช้สกิลหรืออัปสกิลผิดเงื่อนไข','Skill used or upgraded against the rules','技能使用或升级不符合规则'), dup:m('รับรางวัลซ้ำ','Reward claimed twice','重复领取'),cond:m('รับรางวัลก่อนทำเงื่อนไขครบ','Claimed before meeting the condition','未达成条件就领取'),unknown:m('ไม่มีเควสต์/ไอเทมนี้ในระบบ','Quest or item doesn\'t exist','任务或道具不存在'),
  bonus:m('โบนัสประจำวันไม่ถูกต้อง','Daily bonus is wrong','每日奖励不正确'),rng:m('ผลอัญเชิญไม่ตรงกับการสุ่มของระบบ','Summon result doesn\'t match the system roll','召唤结果与系统随机不符'),
  rngitem:m('ไอเทมจากการอัญเชิญไม่อยู่ในแบนเนอร์','Summoned item isn\'t in the banner','召唤道具不在卡池中'),local:m('อัญเชิญตอนยังไม่เชื่อมระบบกลาง (ตรวจผลสุ่มไม่ได้)','Summoned before connecting to the server (roll can\'t be checked)','未连接服务器时召唤(无法核验)'),
  paidgem:m('ใช้เพชรที่เติมด้วยเงินแลกเป็นตั๋ว (ไม่อนุญาต)','Used topped-up gems for summon tickets (not allowed)','用充值宝石兑换召唤券(不允许)'),
@@ -323,6 +340,8 @@ function verifyLedger(o){var ev=o.events||[],ctx=o.ctx,issues=[],bad={},X=blankX
       var had=(X.raid&&X.raid[e.rid])?X.raid[e.rid].n:0;if(!cfgs.some(function(c){return had+e.n<=bossCfg(e.rid,c).q})){add('err',e,'raidcap');break}
       if(e.su||e.sb){var su=Array.isArray(e.su)?e.su:[],prevSu=(X.raid&&X.raid[e.rid]&&X.raid[e.rid].su)||[],cap=0,okSu=su.every(function(id,i){return SK_DEF[id]&&skLv(X,id,e.t)>0&&su.indexOf(id)===i&&prevSu.indexOf(id)<0});su.forEach(function(id){cap+=skMaxBonus(id,skLv(X,id,e.t),e.t)});
         if(!okSu||!((e.sb|0)>=0)||(e.sb|0)>Math.min(cap,skOld(e.t)?14:SK_SBMAX)||(!skOld(e.t)&&su.length>(e.ok|0))){add('err',e,'skill');break}}
+      if(e.st!==undefined&&((e.st|0)!==(e.t>=ENH_T&&e.ok>0?2:0)||e.st!==(e.st|0))){add('err',e,'enh');break}
+      if(e.cb!==undefined){var cbv=e.cb;if(e.t<ENH_T||!(cbv===(cbv|0)&&cbv>=0)||cbv>e.ok*cpBonus(cpBest(X,ctx.items,ownN,Object.keys(adjSum.items||{})))){add('err',e,'cp');break}}
       if(e.gd!==undefined){var gv=e.gd;if(!(typeof gv==='number'&&gv===(gv|0)&&gv>=0)||!cfgs.some(function(c){return gv<=e.ok*gdDmg(c)})){add('err',e,'gd');break}
         if(gv>0){var gdB=adj.filter(function(a){return a.src==='topup'&&int(a.t,0,9e15)<=e.t+6e5}).reduce(function(s,a){return s+int(a.baht,0,1e6,0)},0);if(!cfgs.some(function(c){return gdB>=vipNeed(c,3)})&&(ctx.admins||[]).indexOf(o.uid)<0){add('err',e,'gdvip','฿'+gdB);break}}}
       var pfull=raidPenFull(e.rid,e.n,e.ok),pp=e.pen|0;if(pp<0||pp>pfull||(pp<pfull&&X.coin+(adjSum.coin|0)>=pfull)){add('err',e,'pen');break}
@@ -331,7 +350,7 @@ function verifyLedger(o){var ev=o.events||[],ctx=o.ctx,issues=[],bad={},X=blankX
       if(!X.raid||!X.raid[e.rid]||!X.raid[e.rid].n){add('err',e,'raidjoin');break}if(X.raidw&&X.raidw[e.rid]){add('err',e,'dup');break}
       if(!okR(function(c){return raidWinR(e.rid,c)}))add('err',e,'reward');if(!okLu())add('err',e,'level');
       var RD=ctx.raids&&ctx.raids[e.rid];if(!RD){add('warn',e,'raidunk');break}
-      var parts=Object.keys(RD.hits).filter(function(u){return RD.hits[u].n>0}),dmg=parts.reduce(function(a,u){return a+(RD.hits[u].ok|0)+Math.min(RD.hits[u].sb|0,SK_SBMAX)+Math.min(RD.hits[u].gd|0,(RD.hits[u].ok|0)*100)},0);
+      var parts=Object.keys(RD.hits).filter(function(u){return RD.hits[u].n>0}),dmg=parts.reduce(function(a,u){return a+(RD.hits[u].ok|0)+Math.min(RD.hits[u].sb|0,SK_SBMAX)+Math.min(RD.hits[u].gd|0,(RD.hits[u].ok|0)*100)+Math.min(RD.hits[u].cb|0,(RD.hits[u].ok|0)*5)},0);
       if(parts.indexOf(o.uid)<0){add('err',e,'raidjoin');break}if(!cfgs.some(function(c){return dmg>=bossCfg(e.rid,c).hp})){add('err',e,'raidalive');break}
       var fair=cfgs.some(function(c){var tier=raidRank(e.rid,parts,c)[o.uid];return tier===e.tier&&raidItem(e.rid,o.uid,tier,ctx.items)===e.item});
       if(!fair){var it0=ctx.items[e.item];add(it0&&RAID_RARS.indexOf(it0.rar)>=RAID_RARS.indexOf(e.tier)&&cfgs.some(function(c){return raidRank(e.rid,parts,c)[o.uid]===e.tier})?'warn':'err',e,'raiditem')}break;
@@ -380,6 +399,8 @@ function verifyLedger(o){var ev=o.events||[],ctx=o.ctx,issues=[],bad={},X=blankX
     case 'ex':if(!(e.n>=1)||(e.to!=='gems'&&e.to!=='tickets')){add('err',e,'shape');break}
       if(!cfgs.some(function(c){return c.exOn!==0&&exCost(e.to,e.n,c)===e.cost})){add('err',e,'exrate');break}
       if(!cfgs.some(function(c){var X2=JSON.parse(JSON.stringify(X.ex||{}));var tmp={ex:X2};return exRoom(tmp,e.to,e.d,c)>=e.n}))add('err',e,'excap');break;
+    case 'salv':if(e.t<ENH_T||ownN(e.item)<1){add('err',e,'own');break}var svi=ctx.items[e.item];if(!svi||ENH_NOCAT[svi.cat]||(e.st|0)!==(ENH_ST[svi.rar]|0)){add('err',e,'enh');break}break;
+    case 'enh':var eni=ctx.items[e.item],enl=e.lv|0;if(e.t<ENH_T||ownN(e.item)<1||!eni||ENH_NOCAT[eni.cat]||enl<1||enl>20||((X.enh||{})[e.item]|0)!==enl-1||(e.cost|0)!==enhCoin(enl)||(e.sc|0)!==enl||(X.st|0)<enl||X.coin+adjSum.coin<enhCoin(enl)||!!e.ok!==enhOk(o.uid,e.item,(X.enhn||{})[e.item]|0,enl)){add('err',e,'enh');break}break;
     case 'sell':if(!(e.n>=1)||ownN(e.item)<e.n){add('err',e,'own');break}var si=ctx.items[e.item];if(!si){add('warn',e,'unknown');break}
       var sx=cfgs.map(function(c){return sellPrice(si,c)});if(sx.indexOf(e.price)<0){var hi=Math.max.apply(null,sx.concat([0]));add(e.price>hi?'err':'warn',e,e.price>hi?'sellprice':'pricechg')}break;
     case 'discard':if(!(e.n>=1)||ownN(e.item)<e.n)add('err',e,'own');break;
@@ -421,7 +442,7 @@ function rebuildLedger(o){var usedL={},out=[],X=blankX(),prevH='',ctx=o.ctx,adj=
     case 'review':e.r=reviewR(e.n,e.ok,c);withLevel(X,e,c);break;
     case 'boss':e.r=bossR(X,e.z,e.win,e.ok,e.d,c);withLevel(X,e,c);break;
     case 'talk':break;
-    case 'raid':var hadr=(X.raid&&X.raid[e.rid])?X.raid[e.rid].n:0;if(hadr+e.n>bossCfg(e.rid,c).q)return;e.r=raidR(e.ok,c);if(e.gd>0)e.gd=Math.min(e.gd|0,e.ok*gdDmg(c));var pf2=raidPenFull(e.rid,e.n,e.ok);if(pf2)e.pen=Math.min(pf2,Math.max(0,X.coin+adj.coin));else delete e.pen;withLevel(X,e,c);break;
+    case 'raid':var hadr=(X.raid&&X.raid[e.rid])?X.raid[e.rid].n:0;if(hadr+e.n>bossCfg(e.rid,c).q)return;e.r=raidR(e.ok,c);if(e.gd>0)e.gd=Math.min(e.gd|0,e.ok*gdDmg(c));if(e.t>=ENH_T){e.st=e.ok>0?2:0;if(e.cb>0)e.cb=Math.min(e.cb|0,e.ok*cpBonus(cpBest(X,ctx.items,own,Object.keys(aItems))))}else{delete e.st;delete e.cb}var pf2=raidPenFull(e.rid,e.n,e.ok);if(pf2)e.pen=Math.min(pf2,Math.max(0,X.coin+adj.coin));else delete e.pen;withLevel(X,e,c);break;
     case 'raidwin':if(!X.raid||!X.raid[e.rid]||(X.raidw&&X.raidw[e.rid]))return;e.r=raidWinR(e.rid,c);withLevel(X,e,c);break;
     case 'vip':case 'sch':if(!(e.lv>=1&&e.lv<=10)||(e.k==='vip'?X.vipc:X.schc)[e.lv])return;if(e.k==='sch'&&(X.sp||0)<schNeed(c,e.lv))return;var ne2=(e.k==='vip'?bVip:bSch)(X,e.lv,c);ne2.t=e.t;ne2.d=e.d;e=ne2;break;
     case 'weekly':var WQr=wqOf(X,e.w),wq0=ctx.ent('weekly',e.q,e.t).filter(Boolean)[0];if(!wq0||WQr.c[e.q]||(WQr.p[wq0.key]||0)<wq0.goal)return;e.r=rew(wq0.reward);withLevel(X,e,c);break;
@@ -439,6 +460,8 @@ function rebuildLedger(o){var usedL={},out=[],X=blankX(),prevH='',ctx=o.ctx,adj=
     case 'alvl':if(!(adj.lv&&adj.lv[e.aid]===e.n)||usedL[e.aid])return;usedL[e.aid]=1;break;
     case 'ex':if(!(e.n>=1)||c.exOn===0||exRoom(X,e.to,e.d,c)<e.n)return;e.cost=exCost(e.to,e.n,c);if(e.to==='gems'?X.coin+adj.coin<e.cost:X.gems+adj.gems<e.cost)return;break;
     case 'sell':if(!(e.n>=1)||own(e.item)<e.n||!ctx.items[e.item])return;e.price=sellPrice(ctx.items[e.item],c);break;
+    case 'salv':var rvi=ctx.items[e.item];if(e.t<ENH_T||own(e.item)<1||!rvi||ENH_NOCAT[rvi.cat])return;e.st=ENH_ST[rvi.rar]|0;break;
+    case 'enh':var rei=ctx.items[e.item],rl=((X.enh||{})[e.item]|0)+1;if(e.t<ENH_T||own(e.item)<1||!rei||ENH_NOCAT[rei.cat]||rl>20||(X.st|0)<rl||X.coin+adj.coin<enhCoin(rl))return;e.lv=rl;e.cost=enhCoin(rl);e.sc=rl;e.ok=enhOk(o.uid,e.item,(X.enhn||{})[e.item]|0,rl);break;
     case 'chk':var ck0=ckState(X),cs=CK_TABLE[e.day];if(!cs||e.c!==ck0.c||e.day!==ck0.n+1||(ck0.last&&ck0.last>=e.d))return;e.cc=cs.c||0;e.cg=cs.g||0;if(!(cs.grp||cs.choice))e.item='';else if(!ctx.items[e.item])return;break;
     case 'eva':if(!evaValid(e)||(X.eva&&X.eva[e.day]))return;break;
     case 'pbg':if(typeof PBG_MAP==='undefined'||!PBG_MAP[e.id]||(X.pbg&&X.pbg[e.id])||X.coin+adj.coin<PBG_MAP[e.id].p)return;e.price=PBG_MAP[e.id].p;break;

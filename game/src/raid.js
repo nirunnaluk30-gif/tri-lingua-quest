@@ -48,9 +48,9 @@ function rdName(){var b=RDB==='ev'&&evCur();return b?tx(b.names):t('rd_name')}
 function rdDeadTxt(){return RDB==='ev'?t('rd_evdead').replace('{n}',rdName()):t('rd_dead')}
 function rdPic(big,hurt){if(RDB!=='ev')return rdArt(big,hurt);var b=evCur();if(b&&b.mon&&typeof monImg==='function')return '<span class="goat-art'+(big?' big':'')+(hurt?' hurt':'')+'">'+monImg(b.mon,'rd-art')+'</span>';return b&&b.art==='rex'&&typeof mechaRex==='function'?mechaRex('rx'+(big?'b':'s')+(hurt?'h':''),'rd-art rex-art'+(hurt?' hurt':'')):lionArt(big,hurt)}
 function rdWatch(rid){if(!CL.db||!CL.uid||!rid||RD.rid===rid&&RD.unsub)return;if(RD.unsub){try{RD.unsub()}catch(e){}}RD.rid=rid;RD.hits={};var o=RD;
-  RD.unsub=CL.db.collection('raid/'+rid+'/hits').onSnapshot(function(s){var h={};s.docs.forEach(function(d){var x=d.data();if(IDRE.test(d.id)&&isO(x))h[d.id]={name:str(x.name,30),n:int(x.n,0,50,0),ok:int(x.ok,0,50,0),sb:int(x.sb,0,SK_SBMAX,0),gd:int(x.gd,0,5000,0),t:int(x.t,0,9e15,0)}});o.hits=h;
+  RD.unsub=CL.db.collection('raid/'+rid+'/hits').onSnapshot(function(s){var h={};s.docs.forEach(function(d){var x=d.data();if(IDRE.test(d.id)&&isO(x))h[d.id]={name:str(x.name,30),n:int(x.n,0,50,0),ok:int(x.ok,0,50,0),sb:int(x.sb,0,SK_SBMAX,0),gd:int(x.gd,0,5000,0),cb:int(x.cb,0,250,0),t:int(x.t,0,9e15,0)}});o.hits=h;
     if(UI.scr==='raid'||UI.scr==='home')softRender()},function(){})}
-function rdDmgOf(x){return (x.ok|0)+(x.sb|0)+Math.min(x.gd|0,(x.ok|0)*100)}
+function rdDmgOf(x){return (x.ok|0)+(x.sb|0)+Math.min(x.gd|0,(x.ok|0)*100)+Math.min(x.cb|0,(x.ok|0)*5)}
 function rdStats(){var hp=rdBC().hp,u=Object.keys(RD.hits).filter(function(k){return RD.hits[k].n>0}),dmg=u.reduce(function(a,k){return a+rdDmgOf(RD.hits[k])},0),last=u.reduce(function(a,k){return Math.max(a,RD.hits[k].t)},0);
   return {hp:hp,dmg:Math.min(dmg,hp),left:Math.max(0,hp-dmg),dead:dmg>=hp,parts:u,last:last}}
 function rdDur(ms){ms=Math.max(0,ms);var d=Math.floor(ms/864e5),h=Math.floor(ms%864e5/36e5),mi=Math.floor(ms%36e5/6e4),L0=S.set.lang;
@@ -155,8 +155,8 @@ function rdAnswer(idx){var s=RD.enc;if(!s||s.picked!==null)return;var q=s.qs[s.i
   var lg=langOfQ(q);S.stats[lg][ok?'ok':'ng']++;srsMark(q.w.id,ok);if(ok)s.ok++;tally(s,q,lg,ok);sfx(ok?'hit':'ng');say(ok?t('right'):t('wrong')+'. '+t('answer')+': '+plainLabel(q.w,q.to));touchStreak();save();render();
   if(ok&&q.to!=='py'&&q.type!=='listen'&&hasVoice(q.to))speak(q.w[q.to],q.to)}
 function rdNext(){var s=RD.enc;if(!s||s.picked===null)return;if(s.i<s.qs.length-1){s.i++;s.picked=null;render();return}rdFinish()}
-function rdFinish(){var s=RD.enc;RD.enc=null;rollDaily();var e=bRaid(S,s.rid,s.qs.length,s.ok,Date.now()-s.t0,today(),{c:s.wc,w:s.ww},laArr(s),CFG);if(typeof skStamp==='function')skStamp(e,s);if(s.gd&&s.ok>0)e.gd=s.ok*gdDmg(CFG);var g=commitEv(e);save();
-  var mine=rdMine(s.rid),body={name:S.name,n:mine.n,ok:mine.ok,sb:Math.min(mine.sb|0,SK_SBMAX),gd:mine.gd|0,t:Date.now()};RD.hits[CL.uid]=body;
+function rdFinish(){var s=RD.enc;RD.enc=null;rollDaily();var e=bRaid(S,s.rid,s.qs.length,s.ok,Date.now()-s.t0,today(),{c:s.wc,w:s.ww},laArr(s),CFG);if(typeof skStamp==='function')skStamp(e,s);if(s.gd&&s.ok>0)e.gd=s.ok*gdDmg(CFG);if(Date.now()>=ENH_T){e.st=s.ok>0?2:0;var cpb=typeof bagCpBonus==='function'?bagCpBonus():0;if(cpb&&s.ok>0)e.cb=s.ok*cpb}var g=commitEv(e);save();
+  var mine=rdMine(s.rid),body={name:S.name,n:mine.n,ok:mine.ok,sb:Math.min(mine.sb|0,SK_SBMAX),gd:mine.gd|0,cb:mine.cb|0,t:Date.now()};RD.hits[CL.uid]=body;
   retry(function(){return CL.db.doc('raid/'+s.rid+'/hits/'+CL.uid).set(body)}).then(function(){toast(t('rd_saved'))},function(){RD.err=t('rd_rules');render()});
   showReward(rdName(),g)}
 function rdClaim(){var sl=rdSlot(),rid=RD.rid||sl.id,st=rdStats();if(!st.dead||rdClaimed(rid)||!rdMine(rid).n)return;
@@ -170,7 +170,7 @@ document.addEventListener('keydown',function(e){if(UI.scr!=='raid'||!RD.enc||UI.
   if(RD.enc.picked===null&&/^[1-4]$/.test(e.key)){rdAnswer(+e.key-1);e.preventDefault()}});
 /* the teacher's checker needs the hits of recent bosses */
 function rdLoadVer(){if(!CL.admin||!CL.db||Date.now()-RD.verAt<5*60e3)return;RD.verAt=Date.now();var now=Date.now();
-  for(var k=0;k<8;k++)(function(rid){CL.db.collection('raid/'+rid+'/hits').get().then(function(s){if(!s.docs.length)return;var h={};s.docs.forEach(function(d){var x=d.data();if(isO(x))h[d.id]={n:int(x.n,0,50,0),ok:int(x.ok,0,50,0),sb:int(x.sb,0,SK_SBMAX,0),gd:int(x.gd,0,5000,0),t:int(x.t,0,9e15,0)}});RD.ver[rid]={hits:h}},function(){})})(raidSlot(now-k*7*864e5,CFG).id);EV_BOSSES.forEach(function(b){if(now>=b.start&&now-b.start<60*864e5)CL.db.collection('raid/'+b.id+'/hits').get().then(function(s){var h={};s.docs.forEach(function(d){var x=d.data();if(isO(x))h[d.id]={n:int(x.n,0,50,0),ok:int(x.ok,0,50,0),sb:int(x.sb,0,SK_SBMAX,0),t:int(x.t,0,9e15,0)}});RDS.wk.ver[b.id]={hits:h}},function(){})})}
+  for(var k=0;k<8;k++)(function(rid){CL.db.collection('raid/'+rid+'/hits').get().then(function(s){if(!s.docs.length)return;var h={};s.docs.forEach(function(d){var x=d.data();if(isO(x))h[d.id]={n:int(x.n,0,50,0),ok:int(x.ok,0,50,0),sb:int(x.sb,0,SK_SBMAX,0),gd:int(x.gd,0,5000,0),cb:int(x.cb,0,250,0),t:int(x.t,0,9e15,0)}});RD.ver[rid]={hits:h}},function(){})})(raidSlot(now-k*7*864e5,CFG).id);EV_BOSSES.forEach(function(b){if(now>=b.start&&now-b.start<60*864e5)CL.db.collection('raid/'+b.id+'/hits').get().then(function(s){var h={};s.docs.forEach(function(d){var x=d.data();if(isO(x))h[d.id]={n:int(x.n,0,50,0),ok:int(x.ok,0,50,0),sb:int(x.sb,0,SK_SBMAX,0),t:int(x.t,0,9e15,0)}});RDS.wk.ver[b.id]={hits:h}},function(){})})}
 /* cards on home and map */
 (function(){var H=VIEW.home,M=VIEW.map;
   function both(){var k=RDB;rdUse('ev');var a=rdCard();rdUse('wk');var b=rdCard();rdUse(k);return a+b}
