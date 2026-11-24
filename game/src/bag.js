@@ -42,8 +42,8 @@ VIEW.bag=function(){if(!S.created){UI.scr='title';return VIEW.title()}var tab=UI
   var tabs=[['all',ids.length+2],['wear',wear.length],['use',use.length+1],['mat',1]];
   return '<div class="bag2">'+
    '<section class="bag-win"><div class="bag-wh"><b>'+esc(t('bag_char'))+'</b></div><div class="bag-paper">'+
-    '<div class="bag-doll"><div class="bag-col">'+BAG_SL.slice(0,6).map(slot).join('')+'</div><div class="bag-stage">'+avatar(S,{label:S.name,anim:true,hd:true,noTitle:true})+'</div><div class="bag-col">'+BAG_SL.slice(6).map(slot).join('')+'</div></div>'+
-    '<div class="bag-cp"><span aria-hidden="true">⚔️</span><div><small>'+esc(t('bag_cp'))+' · COMBAT POWER</small><b>'+cp.toLocaleString()+'</b></div></div>'+
+    '<div class="bag-doll"><div class="bag-col">'+BAG_SL.slice(0,6).map(slot).join('')+'</div><div class="bag-stage">'+avatar(S,{label:S.name,anim:true,hd:true,noTitle:true,petRoom:true})+'</div><div class="bag-col">'+BAG_SL.slice(6).map(slot).join('')+'</div></div>'+
+    '<div class="bag-cp"><span aria-hidden="true">⚔️</span><div><small>'+esc(t('bag_cp'))+'</small><b>'+cp.toLocaleString()+'</b></div></div>'+
     '<div class="bag-stats"><div><span>'+esc(t('bag_atk'))+'</span><b>'+Math.round(cp*.068).toLocaleString()+'</b></div><div><span>'+esc(t('bag_def'))+'</span><b>'+Math.round(cp*.04).toLocaleString()+'</b></div><div><span>'+esc(t('bag_bdmg'))+'</span><b>+'+cpb+(enhOnNow()?'':' ⏳')+'</b></div><div><span>'+esc(t('bag_stone'))+'</span><b>'+(S.st|0)+'</b></div></div>'+
     '<div class="bag-btns"><button data-act="bagtab" data-id="wear">'+esc(t('bag_enh'))+'</button><button data-act="bagsalvdup">'+esc(t('bag_salv'))+'</button><button data-act="go" data-id="wd">'+esc(t('n_wd'))+'</button><button data-act="skills">'+esc(t('sk_title'))+'</button></div>'+
    '</div></section>'+

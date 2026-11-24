@@ -176,6 +176,34 @@ function skReq(id,lv,t){return Math.min(skOld(t)?999:60,skU(id,t)+(lv-1)*5)}
 function skDmg(id,lv){var d=SK_DEF[id];return lv?d.d+(lv>=3?1:0)+(lv>=5?1:0):0}
 function skMaxBonus(id,lv,t){if(!lv)return 0;if(skOld(t))return skMaxBonus0(id,lv);var x=SK_DEF[id].x,b=skDmg(id,lv);if(x.pierce)b+=x.pierce;if(x.burn)b+=x.burn;if(x.streak)b+=x.streak[0]*x.streak[1];if(x.combo)b+=x.combo[1];if(x.rest)b+=x.rest;if(x.double)b+=skDmg(id,lv);return b}
 function skMaxBonus0(id,lv){if(!lv)return 0;switch(id){case 'sw1':return [0,1,1,2,2,3][lv];case 'sw3':return lv>=5?8:lv>=4?6:3;case 'mg2':return [0,2,2,3,3,4][lv];case 'mg3':return lv>=5?9:lv>=4?6:4;case 'ar2':return [0,2,2,3,3,4][lv];case 'ar3':return [0,3,3,4,4,5][lv]}return 0}
+/* ===== skill-only boss fights (2026-11-25): every boss is fought with skills for up to 90 s, alone or in a party of up to 5.
+   e.bf = {sec, dmg, cp, pc, u:[[t,id]...], hp, win, pt:{r,m:[pids]}}; u holds every skill press ('b' = basic attack, 'p' = perfect dodge,
+   'r' = revived a friend). The verifier replays the presses: cooldowns, unlocked skills, the round time and a damage ceiling. ===== */
+var BF_T=Date.UTC(2026,10,24,17,0),BF_ROUND=90,BF_CDT=[3,5,7,9,14,25],BF_PCD=2.2,BF_TELE=1.6,BF_GAP=2.6;
+function bfCd(id){return id==='b'?1:BF_CDT[SK_DEF[id].t]}
+function bfMul(lvl,cp,m){return (1+(lvl|0)/100)*(1+.05*Math.min(5,cp|0))*(1+.05*Math.max(0,Math.min(4,(m|0)-1)))}
+function bfHit(d,lvl,cp,m){return Math.round(d*10*bfMul(lvl,cp,m))}
+function bfScale(m){return 1+.6*Math.max(0,Math.min(4,(m|0)-1))}
+function bfZoneLv(zi){return 4+3*Math.max(0,zi|0)}
+function bfTnLv(g,f){var gi=Math.max(0,TN_GATES.indexOf(tnG(g)));return Math.min(70,6+gi*7+(f|0)*2)}
+function bfHp(lv,m){return Math.round(60*lv*bfScale(m))}
+function bfRaidOk(n,dmg,lvl){var tg=48*Math.max(10,lvl|0);return Math.min(n|0,Math.floor((n|0)*Math.max(0,dmg|0)/tg))}
+/* returns '' when the fight is possible, else an issue key */
+function bfCheck(X,e,cpMax){var b=e.bf;if(!isO(b)||e.t<BF_T)return 'shape';var sec=b.sec,u=b.u,m=b.pt&&Array.isArray(b.pt.m)?b.pt.m.length:1;
+  if(!(typeof sec==='number'&&sec>=0&&sec<=BF_ROUND+2)||!Array.isArray(u)||u.length>400||!(m>=1&&m<=5))return 'shape';
+  if(b.pt&&(typeof b.pt.r!=='string'||b.pt.m.some(function(p){return typeof p!=='string'})||m<2))return 'shape';
+  var cp=b.cp|0;if(cp<0||cp>5||cp>cpMax)return 'cp';
+  var ready={},prevT=-1,pc=0,lastP=-9,cap=0,i,x,tt,id;
+  for(i=0;i<u.length;i++){x=u[i];if(!Array.isArray(x))return 'shape';tt=x[0];id=x[1];if(typeof tt!=='number'||tt<prevT-.05||tt>sec+.5)return 'bfcd';prevT=tt;
+    if(id==='p'){if(tt-lastP<BF_PCD-.3)return 'bfcd';lastP=tt;pc++;Object.keys(ready).forEach(function(k){ready[k]-=2});cap+=Math.ceil(bfHit(4,X.lvl,cp,m)*1.5)+1;continue}
+    if(id==='r')continue;
+    var lv=id==='b'?1:(SK_DEF[id]?skLv(X,id,e.t):0);if(!lv)return 'skill';
+    if(tt<(ready[id]||0)-.3)return 'bfcd';ready[id]=tt+bfCd(id);cap+=Math.ceil(bfHit(id==='b'?1:skDmg(id,lv),X.lvl,cp,m)*1.5)+1}
+  if(pc!==(b.pc|0)||pc>Math.floor(Math.max(0,sec-3)/(BF_GAP+BF_TELE))+1)return 'bfcd';
+  if(!(b.dmg===(b.dmg|0)&&b.dmg>=0)||b.dmg>cap)return 'bfdmg';
+  if(b.win){if(!(b.hp>0))return 'shape';if(m<2?b.dmg<b.hp:b.dmg<Math.ceil(b.hp*.05))return 'bfdmg'}
+  return ''}
+function bfHpOk(e,hp0){var b=e.bf,m=b.pt&&Array.isArray(b.pt.m)?b.pt.m.length:1;return !b.win||b.hp===bfHp(hp0,m)}
 var MK_FEE=5,MK_MAXOPEN=6,MK_RANGE={common:[10,300],uncommon:[20,800],rare:[50,2000],epic:[120,5000],legendary:[300,15000],mythic:[600,40000],celestial:[1200,100000]};
 function mkFee(pay){pay=cleanPay(pay);return pay.item?0:Math.ceil(pay.coin*MK_FEE/100)}
 function mkRange(it){return (it&&MK_RANGE[it.rar])||[1,1e7]}
@@ -209,7 +237,7 @@ function applyEvent(X,e){switch(e.k){
   case 'pull':X.tickets-=e.n;(e.items||[]).forEach(function(i){addOwn(X,i)});X.gacha[e.b]=Object.assign({},e.gc);X.stats.pulls+=e.n;break;
   case 'buy':X[e.sh==='gem'?'gems':'coin']-=e.price;addOwn(X,e.item);break;
   case 'tnmon':case 'tnboss':dayOf(X,e.d);X.daily.p.correct+=e.ok;applyWords(X,e);applyGrant(X,e.r,e.lu);tnApply(X,e);break;
-  case 'raid':dayOf(X,e.d);X.daily.p.correct+=e.ok;applyWords(X,e);applyGrant(X,e.r,e.lu);if(!X.raid)X.raid={};var rr=X.raid[e.rid]||{n:0,ok:0};rr.n+=e.n;rr.ok+=e.ok;if(e.sb>0)rr.sb=(rr.sb|0)+(e.sb|0);if(e.gd>0)rr.gd=(rr.gd|0)+(e.gd|0);if(e.cb>0)rr.cb=(rr.cb|0)+(e.cb|0);if(e.st>0)X.st=(X.st|0)+(e.st|0);if(Array.isArray(e.su)&&e.su.length)rr.su=(rr.su||[]).concat(e.su);X.raid[e.rid]=rr;if(e.pen>0)X.coin-=e.pen|0;break;
+  case 'raid':dayOf(X,e.d);X.daily.p.correct+=e.bf?0:e.ok;applyWords(X,e);applyGrant(X,e.r,e.lu);if(!X.raid)X.raid={};var rr=X.raid[e.rid]||{n:0,ok:0};rr.n+=e.n;rr.ok+=e.ok;if(e.sb>0)rr.sb=(rr.sb|0)+(e.sb|0);if(e.gd>0)rr.gd=(rr.gd|0)+(e.gd|0);if(e.cb>0)rr.cb=(rr.cb|0)+(e.cb|0);if(e.st>0)X.st=(X.st|0)+(e.st|0);if(Array.isArray(e.su)&&e.su.length)rr.su=(rr.su||[]).concat(e.su);X.raid[e.rid]=rr;if(e.pen>0)X.coin-=e.pen|0;break;
   case 'alvl':X.lvl=Math.min(999,(X.lvl|0)+(e.n|0));break;
   case 'skup':X.coin-=e.cost|0;if(!X.sk)X.sk={};X.sk[e.sk]=e.lv|0;break;
   case 'skbr':X.coin-=e.cost|0;if(!X.skb)X.skb={};X.skb[e.t2|0]=e.b;if((e.cost|0)>0)X.skbw=bkkWeek(e.t);break;
@@ -256,8 +284,8 @@ function bLesson(X,u,n,ok,dur,d,words,la,cfg){var x=lessonR(X,u,n,ok,cfg);return
 function bReview(X,n,ok,dur,d,words,la,cfg){return withLevel(X,{k:'review',d:d,n:n,ok:ok,dur:dur,wc:words.c,ww:words.w,la:la,r:reviewR(n,ok,cfg)},cfg)}
 function bBoss(X,z,win,n,ok,dur,d,words,la,cfg){return withLevel(X,{k:'boss',d:d,z:z,win:!!win,n:n,ok:ok,dur:dur,wc:words.c,ww:words.w,la:la,r:bossR(X,z,win,ok,d,cfg)},cfg)}
 function bTnMon(X,f,n,ok,dur,d,words,la,cfg,g){g=tnG(g);var win=ok===n&&n>=cfg.tnQ;return withLevel(X,{k:'tnmon',g:g||undefined,d:d,f:f,n:n,ok:ok,win:win,dur:dur,wc:words.c,ww:words.w,la:la,r:tnMonR(X,f,ok,win,d,cfg,g)},cfg)}
-function bTnBoss(X,f,n,ok,dur,d,words,la,cfg,seed,sd,g){g=tnG(g);var T=tnOf(X,g),win=ok===n&&n>=cfg.tnBossQ&&(T.k[f]||0)>=cfg.tnMon,bd=bkkDay();
-  var e={k:'tnboss',g:g||undefined,d:d,f:f,n:n,ok:ok,win:win,dur:dur,wc:words.c,ww:words.w,la:la,bd:bd,sd:sd,items:win&&T.drop[f]!==bd?tnDrop(seed,f,bd,ITEM,cfg,g):[],r:tnBossR(X,f,ok,win,d,cfg,g)};if(!g)delete e.g;return withLevel(X,e,cfg)}
+function bTnBoss(X,f,n,ok,dur,d,words,la,cfg,seed,sd,g,bf){g=tnG(g);var T=tnOf(X,g),win=(bf?!!bf.win:ok===n&&n>=cfg.tnBossQ)&&(T.k[f]||0)>=cfg.tnMon,bd=bkkDay();
+  var e={k:'tnboss',g:g||undefined,d:d,f:f,n:n,ok:ok,win:win,dur:dur,wc:words.c,ww:words.w,la:la,bd:bd,sd:sd,items:win&&T.drop[f]!==bd?tnDrop(seed,f,bd,ITEM,cfg,g):[],r:tnBossR(X,f,ok,win,d,cfg,g)};if(!g)delete e.g;if(bf)e.bf=bf;return withLevel(X,e,cfg)}
 function bRaid(X,rid,n,ok,dur,d,words,la,cfg){var e={k:'raid',d:d,rid:rid,n:n,ok:ok,dur:dur,wc:words.c,ww:words.w,la:la,r:raidR(ok,cfg)},pf=raidPenFull(rid,n,ok);if(pf)e.pen=Math.min(pf,Math.max(0,X.coin|0));return withLevel(X,e,cfg)}
 function bRaidWin(X,rid,tier,item,d,cfg){return withLevel(X,{k:'raidwin',d:d,rid:rid,tier:tier,item:item,r:raidWinR(rid,cfg)},cfg)}
 function bWeekly(X,wq,w,cfg){return withLevel(X,{k:'weekly',w:w,q:wq.id,r:rew(wq.reward)},cfg)}
@@ -287,13 +315,14 @@ enh:m('ตีบวกหรือย่อยของไม่ตรงกต�
  raidjoin:m('รับรางวัลบอสเมืองโกลาหลโดยไม่ได้ร่วมตี','Claimed the Chaos City reward without joining','未参战却领取混沌之城奖励'),raidalive:m('รับรางวัลก่อนบอสเมืองโกลาหลถูกปราบ','Claimed before the Chaos City boss was beaten','首领未被击败就领取奖励'),
  raiditem:m('ของรางวัลบอสเมืองโกลาหลไม่ตรงกับการจับฉลากของระบบ','Chaos City reward does not match the system draw','混沌之城奖励与系统抽签不符'),raidunk:m('ยังโหลดข้อมูลบอสเมืองโกลาหลไม่ได้ ตรวจรางวัลไม่ได้','Chaos City data not loaded — reward not checked','未能载入混沌之城数据,无法核验奖励'),wkday:m('รับเควสประจำสัปดาห์ผิดสัปดาห์','Weekly quest claimed in the wrong week','在错误的周领取每周任务'),
  tnorder:m('เข้าชั้นอุโมงค์ข้ามลำดับ','Entered a tunnel floor out of order','跳层进入时空隧道'),tnmon:m('ชนะบอสอุโมงค์โดยยังปราบมอนสเตอร์ไม่ครบ','Beat a tunnel boss without clearing the monsters','未清完怪物就击败隧道首领'),
+ bfcd:m('กดสกิลบอสเร็วกว่าคูลดาวน์หรือเกินเวลา','Boss skills used faster than their cooldown or past the time','首领技能使用快于冷却或超时'),bfdmg:m('ดาเมจบอสเกินกว่าสกิลที่กดทำได้','Boss damage is more than the skills could deal','首领伤害超过技能可造成的上限'),
  tnday:m('วันที่ดรอปของบอสอุโมงค์ไม่ตรงเวลาเล่น','Tunnel drop date does not match play time','隧道掉落日期与游戏时间不符'),tndrop:m('ของดรอปจากบอสอุโมงค์ไม่ตรงกับการสุ่มของระบบ (อาจเพราะครูแก้ไอเทมภายหลัง)','Tunnel drop does not match the system roll (may be because items were edited later)','隧道掉落与系统随机不符(可能因老师之后修改了道具)'),
  tnlocal:m('ได้ของจากอุโมงค์ตอนยังไม่เชื่อมระบบกลาง (ตรวจผลสุ่มไม่ได้)','Tunnel drop while not connected to the server (roll can\'t be checked)','未连接服务器时的隧道掉落(无法核验)'),
  bound:m('ส่งของพิเศษ VIP/นักปราชญ์ไปแลกเปลี่ยน (ของชนิดนี้แลกไม่ได้)','Put a VIP/Scholar exclusive up for trade (these cannot be traded)','交易了不可交易的VIP/学者专属道具'),rarchg:m('ระดับไอเทมถูกแก้หลังอัญเชิญ','Item rarity changed after the summon','召唤后道具稀有度被修改'),words:m('รายการคำตอบไม่ตรงคะแนน','Answer list doesn\'t match the score','答题记录与得分不符')};
 /* ctx: cfgs(t) -> [cfg...], ent(col,id,t) -> [doc|null ...] candidates, dailyIds(t) -> [[ids]...], items -> map, now */
 function verifyLedger(o){var ev=o.events||[],ctx=o.ctx,issues=[],bad={},X=blankX(),prevH='',prevT=0,days={},lastEnd=0;
   /* reward/level/chain problems are repaired by recomputing; these mean the event itself can't be trusted and is dropped on fix */
-  var DROP={bound:1,paidgem:1,exrate:1,excap:1,own:1,tstate:1,tcross:1,tdouble:1,tnopay:1,sellprice:1,fast:1,overlap:1,daycap:1,back:1,cpback:1,future:1,dup:1,cond:1,unknown:1,rng:1,rngitem:1,price:1,raidtime:1,raidcap:1,raidjoin:1,raidalive:1,wkday:1,tnorder:1,tnmon:1,tnday:1,neg:1,shape:1,words:1,qn:1,first:1,start:1,kind:1};
+  var DROP={bound:1,paidgem:1,exrate:1,excap:1,own:1,tstate:1,tcross:1,tdouble:1,tnopay:1,sellprice:1,fast:1,overlap:1,daycap:1,back:1,cpback:1,future:1,dup:1,cond:1,unknown:1,rng:1,rngitem:1,price:1,raidtime:1,raidcap:1,bfcd:1,bfdmg:1,raidjoin:1,raidalive:1,wkday:1,tnorder:1,tnmon:1,tnday:1,neg:1,shape:1,words:1,qn:1,first:1,start:1,kind:1};
   function add(lv,e,k,extra){issues.push({lv:lv,s:e?e.s:0,k:e?e.k:'',msg:k,extra:extra||''});if(lv==='err'&&e&&DROP[k])bad[e.s]=1}
   var adj=(o.adjust&&Array.isArray(o.adjust.list)?o.adjust.list:[]).filter(function(a){return o.state&&o.state.adjSeen&&o.state.adjSeen[a.id]});
   var adjSum={coin:0,gems:0,tickets:0,items:{},paid:0,lv:{}};(o.adjust&&Array.isArray(o.adjust.list)?o.adjust.list:[]).forEach(function(a){var n=isO(a)?int(a.lvl,0,100,0):0;if(n&&IDRE.test(a.id||''))adjSum.lv[a.id]=n});adj.forEach(function(a){['coin','gems','tickets'].forEach(function(k){adjSum[k]+=int(a[k],-1e8,1e8,0)});if(a.src==='topup')adjSum.paid+=Math.max(0,int(a.gems,-1e8,1e8,0));
@@ -312,8 +341,8 @@ function verifyLedger(o){var ev=o.events||[],ctx=o.ctx,issues=[],bad={},X=blankX
     var timed=e.k==='lesson'||e.k==='review'||e.k==='boss'||e.k==='tnmon'||e.k==='tnboss'||e.k==='raid';
     if(timed){var dur=int(e.dur,0,864e5,0),nq=e.n|0;if(dur<nq*BOT_MS_PER_Q)add('err',e,'fast');else if(dur<nq*MIN_MS_PER_Q)add('warn',e,'quick');if(e.t-dur<lastEnd-5000)add('err',e,'overlap');lastEnd=e.t;
       var dd=days[e.d]=days[e.d]||{ses:0,ms:0};if(e.k!=='tnmon')dd.ses++;dd.ms+=dur;if((dd.ses>150||dd.ms>16*36e5)&&!dd.w){dd.w=1;add('warn',e,'daycap')}
-      var wc=Array.isArray(e.wc)?e.wc:[],ww=Array.isArray(e.ww)?e.ww:[];if(wc.length!==e.ok||wc.length+ww.length!==e.n)add('err',e,'words');
-      if(isO(e.la)){var so=0,sn=0;LANGS.forEach(function(l){var a=e.la[l];if(Array.isArray(a)){so+=a[0]|0;sn+=a[1]|0}});if(so!==e.ok||sn!==e.n)add('err',e,'words')}}
+      var wc=Array.isArray(e.wc)?e.wc:[],ww=Array.isArray(e.ww)?e.ww:[];if(!e.bf&&(wc.length!==e.ok||wc.length+ww.length!==e.n))add('err',e,'words');
+      if(!e.bf&&isO(e.la)){var so=0,sn=0;LANGS.forEach(function(l){var a=e.la[l];if(Array.isArray(a)){so+=a[0]|0;sn+=a[1]|0}});if(so!==e.ok||sn!==e.n)add('err',e,'words')}}
     else if(typeof e.t==='number')lastEnd=Math.max(lastEnd,e.t);
     function okR(fn){return cfgs.some(function(c){return sameR(fn(c),e.r)})}
     function okLu(){return cfgs.some(function(c){return sameLu(levelCalc(X,(e.r&&e.r.exp)||0,c),e.lu)})}
@@ -326,7 +355,9 @@ function verifyLedger(o){var ev=o.events||[],ctx=o.ctx,issues=[],bad={},X=blankX
       if(!cfgs.some(function(c){return sameR(lessonR(X,e.u,e.n,e.ok,c).r,e.r)}))add('err',e,'reward');if(!okLu())add('err',e,'level');break;
     case 'review':if(!(e.n>0)||e.ok<0||e.ok>e.n||!cfgs.some(function(c){return e.n<=c.reviewMax}))add('err',e,'qn');
       if(!okR(function(c){return reviewR(e.n,e.ok,c)}))add('err',e,'reward');if(!okLu())add('err',e,'level');break;
-    case 'boss':if(e.ok<0||e.ok>e.n||e.n>300||(e.win&&e.ok<1))add('err',e,'shape');
+    case 'boss':if(e.bf){var zi0=typeof ZONES!=='undefined'?ZONES.map(function(z){return z.id}).indexOf(e.z):-1,bk=(e.n|0)!==0||(e.ok|0)!==0?'shape':bfCheck(X,e,cpBonus(cpBest(X,ctx.items,ownN,Object.keys(adjSum.items||{}))));
+        if(!bk&&zi0>=0&&!bfHpOk(e,bfZoneLv(zi0)))bk='bfdmg';if(bk){add('err',e,bk);break}}
+      else if(e.ok<0||e.ok>e.n||e.n>300||(e.win&&e.ok<1))add('err',e,'shape');
       if(!okR(function(c){return bossR(X,e.z,e.win,e.ok,e.d,c)}))add('err',e,'reward');if(!okLu())add('err',e,'level');break;
     case 'talk':break;
     case 'story':if(X.story[e.q])add('err',e,'dup');var qs=ctx.ent('story',e.q,e.t).filter(Boolean);if(!qs.length){add('err',e,'unknown');break}
@@ -336,15 +367,16 @@ function verifyLedger(o){var ev=o.events||[],ctx=o.ctx,issues=[],bad={},X=blankX
       if(e.b){var Yc=Object.assign({},X.daily.c);Yc[e.q]=true;var allIds=ctx.dailyIds(e.t);
         if(X.daily.bonus||!allIds.some(function(ids){return ids.length&&ids.every(function(id){return Yc[id]})})||!cfgs.some(function(c){return sameR({tickets:c.dailyBonusTickets,gems:c.dailyBonusGems},e.b)}))add('err',e,'bonus')}break;
     case 'raid':if(!(e.n>=1&&e.n<=50)||e.ok<0||e.ok>e.n||typeof e.rid!=='string'){add('err',e,'shape');break}
+      if(e.bf){var bkr=bfCheck(X,e,cpBonus(cpBest(X,ctx.items,ownN,Object.keys(adjSum.items||{}))));if(bkr){add('err',e,bkr);break}if(e.bf.win||e.ok!==bfRaidOk(e.n,e.bf.dmg,X.lvl)||e.su||(e.sb|0)>e.ok||(e.sb|0)<0){add('err',e,'bfdmg');break}}
       var EVr=evBoss(e.rid),slotOk=EVr?(e.t>=EVr.start-60e3&&e.t<=EVr.start+EVr.hours*3600e3+15*60e3):cfgs.some(function(c){var sl=raidSlot(e.t,c);return sl.id===e.rid&&e.t>=sl.start&&e.t<=sl.end+15*60e3});if(!slotOk){add('err',e,'raidtime');break}
       var had=(X.raid&&X.raid[e.rid])?X.raid[e.rid].n:0;if(!cfgs.some(function(c){return had+e.n<=bossCfg(e.rid,c).q})){add('err',e,'raidcap');break}
-      if(e.su||e.sb){var su=Array.isArray(e.su)?e.su:[],prevSu=(X.raid&&X.raid[e.rid]&&X.raid[e.rid].su)||[],cap=0,okSu=su.every(function(id,i){return SK_DEF[id]&&skLv(X,id,e.t)>0&&su.indexOf(id)===i&&prevSu.indexOf(id)<0});su.forEach(function(id){cap+=skMaxBonus(id,skLv(X,id,e.t),e.t)});
+      if(!e.bf&&(e.su||e.sb)){var su=Array.isArray(e.su)?e.su:[],prevSu=(X.raid&&X.raid[e.rid]&&X.raid[e.rid].su)||[],cap=0,okSu=su.every(function(id,i){return SK_DEF[id]&&skLv(X,id,e.t)>0&&su.indexOf(id)===i&&prevSu.indexOf(id)<0});su.forEach(function(id){cap+=skMaxBonus(id,skLv(X,id,e.t),e.t)});
         if(!okSu||!((e.sb|0)>=0)||(e.sb|0)>Math.min(cap,skOld(e.t)?14:SK_SBMAX)||(!skOld(e.t)&&su.length>(e.ok|0))){add('err',e,'skill');break}}
       if(e.st!==undefined&&((e.st|0)!==(e.t>=ENH_T&&e.ok>0?2:0)||e.st!==(e.st|0))){add('err',e,'enh');break}
       if(e.cb!==undefined){var cbv=e.cb;if(e.t<ENH_T||!(cbv===(cbv|0)&&cbv>=0)||cbv>e.ok*cpBonus(cpBest(X,ctx.items,ownN,Object.keys(adjSum.items||{})))){add('err',e,'cp');break}}
       if(e.gd!==undefined){var gv=e.gd;if(!(typeof gv==='number'&&gv===(gv|0)&&gv>=0)||!cfgs.some(function(c){return gv<=e.ok*gdDmg(c)})){add('err',e,'gd');break}
         if(gv>0){var gdB=adj.filter(function(a){return a.src==='topup'&&int(a.t,0,9e15)<=e.t+6e5}).reduce(function(s,a){return s+int(a.baht,0,1e6,0)},0);if(!cfgs.some(function(c){return gdB>=vipNeed(c,3)})&&(ctx.admins||[]).indexOf(o.uid)<0){add('err',e,'gdvip','฿'+gdB);break}}}
-      var pfull=raidPenFull(e.rid,e.n,e.ok),pp=e.pen|0;if(pp<0||pp>pfull||(pp<pfull&&X.coin+(adjSum.coin|0)>=pfull)){add('err',e,'pen');break}
+      var pfull=e.bf?0:raidPenFull(e.rid,e.n,e.ok),pp=e.pen|0;if(pp<0||pp>pfull||(pp<pfull&&X.coin+(adjSum.coin|0)>=pfull)){add('err',e,'pen');break}
       if(!okR(function(c){return raidR(e.ok,c)}))add('err',e,'reward');if(!okLu())add('err',e,'level');break;
     case 'raidwin':if(typeof e.rid!=='string'||RAID_RARS.indexOf(e.tier)<0){add('err',e,'shape');break}
       if(!X.raid||!X.raid[e.rid]||!X.raid[e.rid].n){add('err',e,'raidjoin');break}if(X.raidw&&X.raidw[e.rid]){add('err',e,'dup');break}
@@ -361,11 +393,12 @@ function verifyLedger(o){var ev=o.events||[],ctx=o.ctx,issues=[],bad={},X=blankX
       var TR=(isV?VIP_TIERS:SCH_TIERS)[lv-1];if(JSON.stringify(Array.isArray(e.items)?e.items:[])!==JSON.stringify(TR.it||[])||!sameR(rew(TR.r),e.r))add('err',e,'reward');
       if(isV){var paidB=adj.filter(function(a){return a.src==='topup'&&int(a.t,0,9e15)<=e.t+6e5}).reduce(function(s,a){return s+int(a.baht,0,1e6,0)},0);if(!cfgs.some(function(c){return paidB>=vipNeed(c,lv)}))add('err',e,'cond','฿'+paidB)}
       else if(!cfgs.some(function(c){return (X.sp||0)>=schNeed(c,lv)}))add('err',e,'cond',String(X.sp||0));if(!okLu())add('err',e,'level');break;
-    case 'tnmon':case 'tnboss':var tf=e.f;if(!(tf>=1&&tf<=10&&tf===(tf|0))||!(e.n>=1&&e.n<=50)||e.ok<0||e.ok>e.n||(e.win&&e.ok!==e.n)||(e.g!==undefined&&TN_GATES.indexOf(e.g)<1)){add('err',e,'shape');break}
+    case 'tnmon':case 'tnboss':var tf=e.f;if(e.k==='tnboss'&&e.bf){var bkt=(e.n|0)!==0||(e.ok|0)!==0?'shape':bfCheck(X,e,cpBonus(cpBest(X,ctx.items,ownN,Object.keys(adjSum.items||{}))));if(!bkt&&!bfHpOk(e,bfTnLv(e.g,tf)))bkt='bfdmg';if(bkt){add('err',e,bkt);break}}
+      if(!(tf>=1&&tf<=10&&tf===(tf|0))||!((e.bf&&e.k==='tnboss')?e.n===0:(e.n>=1&&e.n<=50))||e.ok<0||e.ok>e.n||(e.win&&e.ok!==e.n)||(e.g!==undefined&&TN_GATES.indexOf(e.g)<1)){add('err',e,'shape');break}
       var tg=e.g,TT=tnOf(X,tg);if(tf>TT.max+1){add('err',e,'tnorder');break}
       if(e.k==='tnmon'){if(e.win&&!cfgs.some(function(c){return e.n>=c.tnQ}))add('err',e,'qn');
         if(!okR(function(c){return tnMonR(X,tf,e.ok,e.win,e.d,c,tg)}))add('err',e,'reward');if(!okLu())add('err',e,'level');break}
-      if(e.win&&!cfgs.some(function(c){return e.n>=c.tnBossQ}))add('err',e,'qn');
+      if(e.win&&!e.bf&&!cfgs.some(function(c){return e.n>=c.tnBossQ}))add('err',e,'qn');
       if(e.win&&!cfgs.some(function(c){return (TT.k[tf]||0)>=c.tnMon})){add('err',e,'tnmon');break}
       if(!okR(function(c){return tnBossR(X,tf,e.ok,e.win,e.d,c,tg)}))add('err',e,'reward');if(!okLu())add('err',e,'level');
       var its=Array.isArray(e.items)?e.items:[];if(its.length>3||(!e.win&&its.length)){add('err',e,'shape');break}
@@ -442,12 +475,12 @@ function rebuildLedger(o){var usedL={},out=[],X=blankX(),prevH='',ctx=o.ctx,adj=
     case 'review':e.r=reviewR(e.n,e.ok,c);withLevel(X,e,c);break;
     case 'boss':e.r=bossR(X,e.z,e.win,e.ok,e.d,c);withLevel(X,e,c);break;
     case 'talk':break;
-    case 'raid':var hadr=(X.raid&&X.raid[e.rid])?X.raid[e.rid].n:0;if(hadr+e.n>bossCfg(e.rid,c).q)return;e.r=raidR(e.ok,c);if(e.gd>0)e.gd=Math.min(e.gd|0,e.ok*gdDmg(c));if(e.t>=ENH_T){e.st=e.ok>0?2:0;if(e.cb>0)e.cb=Math.min(e.cb|0,e.ok*cpBonus(cpBest(X,ctx.items,own,Object.keys(aItems))))}else{delete e.st;delete e.cb}var pf2=raidPenFull(e.rid,e.n,e.ok);if(pf2)e.pen=Math.min(pf2,Math.max(0,X.coin+adj.coin));else delete e.pen;withLevel(X,e,c);break;
+    case 'raid':var hadr=(X.raid&&X.raid[e.rid])?X.raid[e.rid].n:0;if(hadr+e.n>bossCfg(e.rid,c).q)return;if(e.bf){e.ok=bfRaidOk(e.n,e.bf.dmg,X.lvl);e.sb=e.ok;delete e.su}e.r=raidR(e.ok,c);if(e.gd>0)e.gd=Math.min(e.gd|0,e.ok*gdDmg(c));if(e.t>=ENH_T){e.st=e.ok>0?2:0;if(e.cb>0)e.cb=Math.min(e.cb|0,e.ok*cpBonus(cpBest(X,ctx.items,own,Object.keys(aItems))))}else{delete e.st;delete e.cb}var pf2=e.bf?0:raidPenFull(e.rid,e.n,e.ok);if(pf2)e.pen=Math.min(pf2,Math.max(0,X.coin+adj.coin));else delete e.pen;withLevel(X,e,c);break;
     case 'raidwin':if(!X.raid||!X.raid[e.rid]||(X.raidw&&X.raidw[e.rid]))return;e.r=raidWinR(e.rid,c);withLevel(X,e,c);break;
     case 'vip':case 'sch':if(!(e.lv>=1&&e.lv<=10)||(e.k==='vip'?X.vipc:X.schc)[e.lv])return;if(e.k==='sch'&&(X.sp||0)<schNeed(c,e.lv))return;var ne2=(e.k==='vip'?bVip:bSch)(X,e.lv,c);ne2.t=e.t;ne2.d=e.d;e=ne2;break;
     case 'weekly':var WQr=wqOf(X,e.w),wq0=ctx.ent('weekly',e.q,e.t).filter(Boolean)[0];if(!wq0||WQr.c[e.q]||(WQr.p[wq0.key]||0)<wq0.goal)return;e.r=rew(wq0.reward);withLevel(X,e,c);break;
     case 'tnmon':var T1=tnOf(X,e.g);if(!(e.f>=1&&e.f<=T1.max+1))return;e.win=e.ok===e.n&&e.n>=c.tnQ;e.r=tnMonR(X,e.f,e.ok,e.win,e.d,c,e.g);withLevel(X,e,c);break;
-    case 'tnboss':var T2=tnOf(X,e.g);if(!(e.f>=1&&e.f<=T2.max+1))return;e.win=e.ok===e.n&&e.n>=c.tnBossQ&&(T2.k[e.f]||0)>=c.tnMon;e.r=tnBossR(X,e.f,e.ok,e.win,e.d,c,e.g);
+    case 'tnboss':var T2=tnOf(X,e.g);if(!(e.f>=1&&e.f<=T2.max+1))return;e.win=(e.bf?!!e.bf.win:e.ok===e.n&&e.n>=c.tnBossQ)&&(T2.k[e.f]||0)>=c.tnMon;e.r=tnBossR(X,e.f,e.ok,e.win,e.d,c,e.g);
       if(!e.win||typeof e.bd!=='string'||T2.drop[e.f]===e.bd)e.items=[];else if(e.sd==='u')e.items=tnDrop(o.uid,e.f,e.bd,ctx.items,c,e.g);else e.items=(Array.isArray(e.items)?e.items:[]).filter(function(id){return ctx.items[id]}).slice(0,3);withLevel(X,e,c);break;
     case 'story':var q=ctx.ent('story',e.q,e.t).filter(Boolean)[0];if(!q||X.story[e.q]||!storyDone(q,X))return;e.r=rew(q.reward);withLevel(X,e,c);break;
     case 'daily':dayOf(X,e.d);var dq=ctx.ent('daily',e.q,e.t).filter(Boolean)[0];if(!dq||X.daily.c[e.q]||(X.daily.p[dq.key]||0)<dq.goal)return;var ne=bDaily(X,dq,e.d,ctx.dailyIds(e.t)[0]||[],c);ne.t=e.t;e=ne;break;

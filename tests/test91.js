@@ -6,7 +6,7 @@ const URL = 'file:///home/claude/trilingua/index.html';
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const results = [], errors = []; const check = (n, ok, info) => results.push((ok ? 'PASS ' : 'FAIL ') + n + (info ? ' — ' + info : ''));
   const wait = ms => new Promise(r => setTimeout(r, ms));
-  async function open(role, uid) { const p = await ctx.newPage(); p.on('pageerror', e => errors.push(uid + ': ' + e.message)); await p.addInitScript(MOCK(role, uid)); await p.goto(URL); await wait(300); return p; }
+  async function open(role, uid) { const p = await ctx.newPage(); p.on('pageerror', e => errors.push(uid + ': ' + e.message)); await p.addInitScript('window.__noBX=1'); await p.addInitScript(MOCK(role, uid)); await p.goto(URL); await wait(300); return p; }
   const WANT = { m: { 7: 'boss_coast_shellguard_warlord', 8: 'boss_aw_cave_beetle', 9: 'boss_aw_brood_empress', 10: 'boss_aw_drill_colossus' }, n: { 7: 'boss_ruins_crimson_count', 8: 'boss_aw_drowned_captain', 9: 'boss_aw_shellguard_warlord', 10: 'boss_aw_rift_dragon_king' } };
   try {
   const A = await open('admin', 'u_admin'); await A.evaluate(() => localStorage.clear()); await A.reload(); await wait(400);

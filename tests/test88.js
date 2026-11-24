@@ -8,7 +8,7 @@ const clock = at => `(function(){var off=${at}-Date.now();var D=Date;function N(
   const results = [], errors = []; const check = (n, ok, info) => results.push((ok ? 'PASS ' : 'FAIL ') + n + (info ? ' — ' + info : ''));
   const wait = ms => new Promise(r => setTimeout(r, ms));
   const AT = Date.UTC(2026, 10, 23, 8, 0); // 15:00 Bangkok, world boss open
-  async function open(role, uid, at) { const p = await ctx.newPage(); p.on('pageerror', e => errors.push(uid + ': ' + e.message)); if (at) await p.addInitScript(clock(at)); await p.addInitScript(MOCK(role, uid)); await p.goto(URL); await wait(300); return p; }
+  async function open(role, uid, at) { const p = await ctx.newPage(); p.on('pageerror', e => errors.push(uid + ': ' + e.message)); if (at) await p.addInitScript(clock(at)); await p.addInitScript('window.__noBX=1'); await p.addInitScript(MOCK(role, uid)); await p.goto(URL); await wait(300); return p; }
   try {
   const A = await open('admin', 'u_admin', AT); await A.evaluate(() => localStorage.clear()); await A.reload(); await wait(400);
   await A.click('[data-act=go][data-id=admin]'); await A.click('[data-act=admseed][data-id=all]'); await wait(40000);

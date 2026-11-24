@@ -9,7 +9,7 @@ const clock = `(function(){var off=${OFF0};var D=Date;function N(){if(arguments.
   const wait = ms => new Promise(r => setTimeout(r, ms));
   for (const vp of [{ width: 1366, height: 768, tag: 'pc' }, { width: 390, height: 844, tag: 'ph' }]) {
   const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height } });
-  async function open(role, uid) { const p = await ctx.newPage(); p.on('pageerror', e => errors.push(uid + ': ' + e.message)); await p.addInitScript(clock); await p.addInitScript(MOCK(role, uid)); await p.goto(URL); await wait(300); return p; }
+  async function open(role, uid) { const p = await ctx.newPage(); p.on('pageerror', e => errors.push(uid + ': ' + e.message)); await p.addInitScript(clock); await p.addInitScript('window.__noBX=1'); await p.addInitScript(MOCK(role, uid)); await p.goto(URL); await wait(300); return p; }
   try {
   const A = await open('admin', 'u_admin'); await A.evaluate(() => localStorage.clear()); await A.reload(); await wait(400);
   await A.click('[data-act=go][data-id=admin]'); await A.click('[data-act=admseed][data-id=all]'); await wait(40000);

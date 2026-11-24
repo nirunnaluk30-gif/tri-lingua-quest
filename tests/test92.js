@@ -8,7 +8,7 @@ const clock = at => `(function(){var off=${at}-Date.now();var D=Date;function N(
   const results = [], errors = []; const check = (n, ok, info) => results.push((ok ? 'PASS ' : 'FAIL ') + n + (info ? ' — ' + info : ''));
   const wait = ms => new Promise(r => setTimeout(r, ms));
   const AT = Date.UTC(2026, 10, 24, 8, 0);
-  async function open(role, uid) { const p = await ctx.newPage(); p.on('pageerror', e => errors.push(uid + ': ' + e.message)); await p.addInitScript(clock(AT)); await p.addInitScript(MOCK(role, uid)); await p.goto(URL); await wait(300); return p; }
+  async function open(role, uid) { const p = await ctx.newPage(); p.on('pageerror', e => errors.push(uid + ': ' + e.message)); await p.addInitScript(clock(AT)); await p.addInitScript('window.__noBX=1'); await p.addInitScript(MOCK(role, uid)); await p.goto(URL); await wait(300); return p; }
   const mk = async (uid, name) => { const P = await open('student', uid); await wait(800); await P.click('[data-act=newgame]'); await P.fill('#hname', name); await P.click('[data-act=dcls][data-id=mage]'); await P.click('[data-act=confirmcreate]'); await wait(2500); return P };
   try {
   const A = await open('admin', 'u_admin'); await A.evaluate(() => localStorage.clear()); await A.reload(); await wait(400);

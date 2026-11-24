@@ -11,7 +11,7 @@ const MOCK = (role, uid) => `
   function deliver(x,s){if(x.dead)return;if(x.t==='doc')x.cb(snapDoc(x.p,s));else{var d=colDocs(x.p,s);x.cb({docs:d,size:d.length,empty:!d.length,docChanges:function(){return []},metadata:{fromCache:false,hasPendingWrites:false}})}}
   window.addEventListener('storage',function(e){if(e.key===KEY)fire()});
   var ROLE=${JSON.stringify(role)},UID=${JSON.stringify(uid)};
-  function allowed(path){if(path.indexOf('mkclaim/')===0){if(localStorage.__noClaimRule==='1')return false;var ex=load()[path];return !ex}return ROLE==='admin'||path.indexOf('players/'+UID)===0||path==='market/'+UID||path==='town/'+UID||path==='topup/'+UID||(path.indexOf('presence/')===0)||(path.indexOf('board/')===0)||(path.indexOf('raid/')===0&&path.indexOf('/hits/')>0&&path.split('/').pop()===UID)}
+  function allowed(path){if(path.indexOf('mkclaim/')===0){if(localStorage.__noClaimRule==='1')return false;var ex=load()[path];return !ex}return ROLE==='admin'||path.indexOf('players/'+UID)===0||path==='market/'+UID||path==='town/'+UID||path==='party/'+UID||path==='pfight/'+UID||path==='topup/'+UID||(path.indexOf('presence/')===0)||(path.indexOf('board/')===0)||(path.indexOf('raid/')===0&&path.indexOf('/hits/')>0&&path.split('/').pop()===UID)}
   window.__writes=0;
   function docRef(path){return {id:path.split('/').pop(),path:path,
     get:function(){if(path.indexOf('mkclaim/')===0&&localStorage.__noClaimRule==='1')return Promise.reject({code:'permission-denied'});return Promise.resolve(snapDoc(path,load()))},

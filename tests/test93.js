@@ -9,7 +9,7 @@ const clock = at => `(function(){var off=${OFF0};var D=Date;function N(){if(argu
   const results = [], errors = []; const check = (n, ok, info) => results.push((ok ? 'PASS ' : 'FAIL ') + n + (info ? ' — ' + info : ''));
   const wait = ms => new Promise(r => setTimeout(r, ms));
   const AT = Date.UTC(2026, 10, 25, 8, 0); // 25 Nov 15:00 BKK: skill trees v2 live, World Goat open
-  async function open(role, uid) { const p = await ctx.newPage(); p.on('pageerror', e => errors.push(uid + ': ' + e.message)); await p.addInitScript(clock(AT)); await p.addInitScript(MOCK(role, uid)); await p.goto(URL); await wait(300); return p; }
+  async function open(role, uid) { const p = await ctx.newPage(); p.on('pageerror', e => errors.push(uid + ': ' + e.message)); await p.addInitScript(clock(AT)); await p.addInitScript('window.__noBX=1'); await p.addInitScript(MOCK(role, uid)); await p.goto(URL); await wait(300); return p; }
   try {
   const A = await open('admin', 'u_admin'); await A.evaluate(() => localStorage.clear()); await A.reload(); await wait(400);
   await A.click('[data-act=go][data-id=admin]'); await A.click('[data-act=admseed][data-id=all]'); await wait(40000);

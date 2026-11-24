@@ -7,7 +7,7 @@ const clock = at => `(function(){var off=${at}-Date.now();var D=Date;function N(
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const results = [], errors = []; const check = (n, ok, info) => results.push((ok ? 'PASS ' : 'FAIL ') + n + (info ? ' — ' + info : ''));
   const wait = ms => new Promise(r => setTimeout(r, ms));
-  async function open(role, uid, at) { const p = await ctx.newPage(); p.on('pageerror', e => errors.push(uid + ': ' + e.message)); if (at) await p.addInitScript(clock(at)); await p.addInitScript(MOCK(role, uid)); await p.goto(URL); await wait(300); return p; }
+  async function open(role, uid, at) { const p = await ctx.newPage(); p.on('pageerror', e => errors.push(uid + ': ' + e.message)); if (at) await p.addInitScript(clock(at)); await p.addInitScript('window.__noBX=1'); await p.addInitScript(MOCK(role, uid)); await p.goto(URL); await wait(300); return p; }
   const B = (d, h) => Date.UTC(2026, 10, d, h - 7, 0); // Bangkok time -> UTC
   try {
   const A = await open('admin', 'u_admin', B(23, 15)); await A.evaluate(() => localStorage.clear()); await A.reload(); await wait(400);

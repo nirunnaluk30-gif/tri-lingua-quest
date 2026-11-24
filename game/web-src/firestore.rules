@@ -1,5 +1,5 @@
 rules_version = '2';
-// TRI-LINGUA Quest — Cloud Firestore security rules (v2.4, 2026-11-16: + instant-buy claims)
+// TRI-LINGUA Quest — Cloud Firestore security rules (v2.5, 2026-11-25: + boss parties)
 // Each student signs in with an ID; their Firebase email is  id_<ID>@id.trilingua.local
 // and their player id in the game is  id_<ID>.  Admins are listed in /admins/{playerId}.
 // v2: only real game logins count (exact email form + password sign-in), saves and admin
@@ -128,6 +128,11 @@ service cloud.firestore {
       allow write: if isAdmin() || (isMe(pid) && request.resource.data.n is int && request.resource.data.ok is int
                      && request.resource.data.n <= 10 && request.resource.data.ok >= 0 && request.resource.data.ok <= request.resource.data.n);
     }
+
+    // boss parties (2026-11-25): party = lobby (room code, who joined), pfight = live fight state.
+    // Everyone signed in can see them; each student writes only their own document.
+    match /party/{pid}  { allow read: if signedIn(); allow write: if isAdmin() || isMe(pid); }
+    match /pfight/{pid} { allow read: if signedIn(); allow write: if isAdmin() || isMe(pid); }
 
     // anything else is closed
     match /{document=**} { allow read, write: if false; }
