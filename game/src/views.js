@@ -150,15 +150,28 @@ function itemCard(it,o){o=o||{};var q=S.owned[it.id]||0;var on=o.eq;
   return '<button class="item r-'+it.rar+(o.lock?' locked':'')+'" data-act="'+(o.act||'equip')+'" data-id="'+esc(it.id)+'"'+(o.src?' data-src="'+o.src+'"':'')+' aria-pressed="'+(on?'true':'false')+'"'+(o.dis?' disabled':'')+'>'+
    '<span class="thumb">'+itemThumb(it)+'</span>'+(on?'<span class="eqb">'+esc(t('equipped'))+'</span>':'')+(q>1&&!o.noQty?'<span class="qty num">×'+q+'</span>':'')+
    '<span class="nm">'+esc(tx(it.names))+'</span><span class="mt"><span class="rtxt r-'+it.rar+'">'+esc(tx(RAR[it.rar].names))+'</span> · '+esc(tx(CAT[it.cat].names))+(it.cat==='accessories'?' · '+esc(tx(SLOT_NAMES[slotOf(it)])):'')+(it.cat==='pet'&&PET_ORIGIN[it.v.k]?' · 🌏 '+esc(tx(PET_ORIGIN[it.v.k])):'')+'</span>'+(o.extra||'')+'</button>'}
-VIEW.wd=function(){var cats=CATS.filter(function(c){return ITEMS.some(function(i){return i.cat===c.id&&S.owned[i.id]})});
-  var list=ITEMS.filter(function(i){return S.owned[i.id]>0&&(UI.cat==='all'||i.cat===UI.cat)}).sort(function(a,b){return RAR[b.rar].order-RAR[a.rar].order});
+/* wardrobe groups (2026-11-27): main groups first, then the slots inside the chosen group */
+var WD_GROUPS=[{id:'weapon',ic:'🗡️',names:m('อาวุธ','Weapons','武器'),sl:['weapon']},
+ {id:'wear',ic:'👗',names:m('ชุด','Clothes','服装'),sl:['outfit','top','bottom','shoes']},
+ {id:'head',ic:'💇',names:m('ผมและหมวก','Hair & hats','发型与帽子'),sl:['hair','hairColor','headwear','acchead']},
+ {id:'acc',ic:'💍',names:m('เครื่องประดับ','Accessories','饰品'),sl:['accessories','wings','aura']},
+ {id:'pet',ic:'🐾',names:m('สัตว์เลี้ยง','Pets','宠物'),sl:['pet']},
+ {id:'other',ic:'📦',names:m('อื่นๆ','Others','其他'),sl:[]}];
+function wdGroupOf(it){var s=slotOf(it);for(var i=0;i<WD_GROUPS.length-1;i++)if(WD_GROUPS[i].sl.indexOf(s)>=0)return WD_GROUPS[i].id;return 'other'}
+function wdSub(it){var s=slotOf(it);return s==='weapon'?'w_'+(weaponClass(it.v&&it.v.k)||'x'):s}
+function wdSlotName(s){if(s.indexOf('w_')===0){var c=CLASSES[s.slice(2)];return c?tx(c.names)+(s.slice(2)===S.cls?' ⭐':''):t('all')}return CAT[s]?tx(CAT[s].names):SLOT_NAMES[s]?tx(SLOT_NAMES[s]):s}
+VIEW.wd=function(){var own=ITEMS.filter(function(i){return S.owned[i.id]>0}),cnt={};own.forEach(function(i){var g=wdGroupOf(i);cnt[g]=(cnt[g]||0)+1});
+  var groups=WD_GROUPS.filter(function(g){return cnt[g.id]});if(!groups.some(function(g){return g.id===UI.wdg}))UI.wdg=groups.length?groups[0].id:'wear';
+  var inG=own.filter(function(i){return wdGroupOf(i)===UI.wdg}),subs=[],sc={};inG.forEach(function(i){var s=wdSub(i);if(!sc[s]){sc[s]=0;subs.push(s)}sc[s]++});
+  var G0=WD_GROUPS.filter(function(g){return g.id===UI.wdg})[0];subs.sort(function(a,b){var o=G0.sl.concat(['w_'+S.cls,'w_sword','w_mage','w_archer']);return (o.indexOf(a)<0?99:o.indexOf(a))-(o.indexOf(b)<0?99:o.indexOf(b))});if(subs.indexOf(UI.wds)<0)UI.wds='all';
+  var list=inG.filter(function(i){return UI.wds==='all'||wdSub(i)===UI.wds}).sort(function(a,b){return RAR[b.rar].order-RAR[a.rar].order});
   var worn=Object.keys(S.eq).map(function(k){return ITEM[S.eq[k]]}).filter(Boolean);
   var h='<div class="cols wdcols"><section class="panel stack" style="justify-items:center;align-self:start"><div class="stagebox" style="width:240px">'+avatar(S,{label:S.name,anim:true})+stageFrame(S)+'</div>'+
    '<b style="font-family:var(--f-display);font-size:20px;font-weight:500">'+esc(S.name)+'</b><small class="mut" style="text-align:center">'+esc(t('nostats'))+'</small>'+
    '<div class="stack" style="width:100%;gap:6px">'+worn.map(function(it){var lockSlot=it.cat==='hair'||(it.cat==='outfit'&&STARTERS[S.gender].indexOf(it.id)>=0);
      return '<div class="row" style="justify-content:space-between;font-size:13px"><span><span class="rtxt r-'+it.rar+'">●</span> '+esc(tx(it.names))+'</span>'+(lockSlot?'':'<button class="btn sm sec" data-act="uneq" data-id="'+slotOf(it)+'">'+esc(t('unequip'))+'</button>')+'</div>'}).join('')+'</div></section>'+
-   '<section class="panel stack"><div class="row" style="justify-content:space-between"><h1 style="font-size:24px;margin:0">'+esc(t('n_wd'))+'</h1><span class="row" style="gap:6px"><button class="btn sm '+(UI.manage?'':'sec')+'" data-act="wdmanage" aria-pressed="'+!!UI.manage+'">🛠 '+esc(t('mk_manage'))+'</button>'+(CL.uid&&tradeOn()?'<button class="btn sm sec" data-act="go" data-id="market">🔁 '+esc(t('mk_title'))+'</button>':'')+'</span></div>'+(UI.manage?'<div class="notice" style="display:block">'+esc(t('mk_managehint'))+'</div>':'')+'<div class="tabs" role="group"><button data-act="cat" data-id="all" aria-pressed="'+(UI.cat==='all')+'">'+esc(t('all'))+'</button>'+
-   cats.map(function(c){return '<button data-act="cat" data-id="'+c.id+'" aria-pressed="'+(UI.cat===c.id)+'">'+esc(tx(c.names))+'</button>'}).join('')+'</div>';
+   '<section class="panel stack"><div class="row" style="justify-content:space-between"><h1 style="font-size:24px;margin:0">'+esc(t('n_wd'))+'</h1><span class="row" style="gap:6px"><button class="btn sm '+(UI.manage?'':'sec')+'" data-act="wdmanage" aria-pressed="'+!!UI.manage+'">🛠 '+esc(t('mk_manage'))+'</button>'+(CL.uid&&tradeOn()?'<button class="btn sm sec" data-act="go" data-id="market">🔁 '+esc(t('mk_title'))+'</button>':'')+'</span></div>'+(UI.manage?'<div class="notice" style="display:block">'+esc(t('mk_managehint'))+'</div>':'')+'<div class="tabs wd-groups" role="group" aria-label="'+esc(t('n_wd'))+'">'+groups.map(function(g){return '<button data-act="wdg" data-id="'+g.id+'" aria-pressed="'+(UI.wdg===g.id)+'">'+g.ic+' '+esc(tx(g.names))+' <small class="wd-n">'+cnt[g.id]+'</small></button>'}).join('')+'</div>'+
+   (subs.length>1?'<div class="tabs wd-subs" role="group"><button data-act="wds" data-id="all" aria-pressed="'+(UI.wds==='all')+'">'+esc(t('all'))+' <small class="wd-n">'+inG.length+'</small></button>'+subs.map(function(s){return '<button data-act="wds" data-id="'+s+'" aria-pressed="'+(UI.wds===s)+'">'+esc(wdSlotName(s))+' <small class="wd-n">'+sc[s]+'</small></button>'}).join('')+'</div>':'');
   if(!list.length)h+='<div class="empty">'+esc(t('noitems'))+'</div>';
   else h+='<div class="igrid">'+list.map(function(it){var bad=!canEquip(it.id),wc=slotOf(it)==='weapon'?weaponClass(it.v.k):null;var why=wc&&wc!==S.cls?t('forcls')+' '+tx(CLASSES[wc].names):t('wrongg');var clsLock=bad&&wc&&wc!==S.cls&&!(it.g&&it.g!==S.gender);if(UI.manage)return itemCard(it,{eq:S.eq[slotOf(it)]===it.id,act:'itemmenu',extra:'<small class="wlock" style="color:var(--accent)">🛠 '+esc(t('mk_tapmanage'))+'</small>'});return itemCard(it,{eq:S.eq[slotOf(it)]===it.id,dis:bad&&!clsLock,act:clsLock?'wpnlock':null,lock:clsLock,extra:bad?'<small class="wlock">🔒 '+esc(why)+(clsLock?' · '+esc(t('wl_tap')):'')+'</small>':''})}).join('')+'</div>';
   return h+'</section></div>'};
@@ -350,6 +363,8 @@ document.addEventListener('click',function(e){var el=e.target.closest('[data-act
   case 'claimd':claimDaily(id);break;
   case 'claimw':claimWeekly(id);break;
   case 'cat':UI.cat=id;render();break;
+  case 'wdg':UI.wdg=id;UI.wds='all';render();break;
+  case 'wds':UI.wds=id;render();break;
   case 'equip':equip(id);save();render();break;
   case 'logoutask':UI.modal={kind:'logout'};render();break;
   case 'logoutgo':var lc=document.getElementById('lo_clear');logout(lc?lc.checked:id==='1');break;

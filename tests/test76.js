@@ -35,7 +35,7 @@ const URL = 'file:///home/claude/trilingua/index.html';
 
   await A0.evaluate(() => { localStorage.__noClaimRule = '1' });
   await A.evaluate(() => document.querySelector('nav [data-id=wd]').click()); await A.click('[data-act=wdmanage]');
-  await A.click('[data-act=itemmenu][data-id=pt10]'); await A.click('[data-act=imtab][data-id=trade]'); await A.fill('#im_coin', '1500'); await A.click('[data-act=imtrade]'); await wait(1500);
+  await A.evaluate(() => { const b = document.querySelector('.wd-groups [data-id=pet]'); b && b.click() }); await A.click('[data-act=itemmenu][data-id=pt10]'); await A.click('[data-act=imtab][data-id=trade]'); await A.fill('#im_coin', '1500'); await A.click('[data-act=imtrade]'); await wait(1500);
   a = await S(A); const tid = Object.keys(a.trades)[0]; const acoin0 = a.coin;
   await A.close();
   const goMk = async (P) => { await P.evaluate(() => document.querySelector('nav [data-id=wd]').click()); await P.click('[data-act=go][data-id=market]'); await wait(1200) };

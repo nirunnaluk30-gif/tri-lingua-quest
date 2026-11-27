@@ -1238,3 +1238,6 @@ body.bx-open{overflow:hidden}
  #bx .bx-boss{left:60%;top:40%}#bx .bx-boss img,#bx .bx-boss svg{max-height:40vh;max-width:70vw}#bx .bx-hero{left:26%;bottom:30%}#bx .bx-tip{top:178px}
  #bx .bx-plist{top:128px;left:6px;right:6px;width:auto;flex-direction:row;flex-wrap:wrap}#bx .pt-row{flex:1 1 30%;font-size:11px;padding:3px 6px}#bx .pt-slots{grid-template-columns:repeat(3,1fr)}}
 @media (prefers-reduced-motion:reduce){#bx .bx-dmg,#bx .bx-sk.ready,#bx .bx-dodge.warn,#bx .bx-boss.stag{animation:none}}
+
+/* wardrobe groups */
+.wd-groups button{font-weight:600}.wd-subs{margin-top:-4px}.wd-subs button{font-size:13px;padding:4px 12px;min-height:34px}.wd-n{opacity:.65;font-weight:400;font-variant-numeric:tabular-nums}

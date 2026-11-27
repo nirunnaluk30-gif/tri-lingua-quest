@@ -32,15 +32,15 @@ const URL = 'file:///home/claude/trilingua/index.html';
   check('gifts arrived', a.owned.pt10 === 3 && b.coin >= 2000, a.owned.pt10 + ' / ' + b.coin);
   // Ann: manage mode -> sell 1 pt10
   await A.evaluate(() => document.querySelector('nav [data-id=wd]').click()); await A.click('[data-act=wdmanage]');
-  await A.click('[data-act=itemmenu][data-id=pt10]'); await A.screenshot({ path: 'm1-menu.png' });
+  await A.evaluate(() => { const b = document.querySelector('.wd-groups [data-id=pet]'); b && b.click() }); await A.click('[data-act=itemmenu][data-id=pt10]'); await A.screenshot({ path: 'm1-menu.png' });
   const coin0 = a.coin; await A.click('[data-act=imsell]'); a = await S(A);
   check('sell gives coins and removes item', a.owned.pt10 === 2 && a.coin === coin0 + 600, a.owned.pt10 + ' ' + (a.coin - coin0));
   // Ann: drop starter -> blocked
   const starter = Object.keys(a.owned).find(k => /^sof|^som/.test(k));
-  await A.click(`[data-act=itemmenu][data-id=${starter}]`); await A.click('[data-act=imtab][data-id=drop]');
+  await A.evaluate(() => { const b = document.querySelector('.wd-groups [data-id=wear]'); b && b.click() }); await A.click(`[data-act=itemmenu][data-id=${starter}]`); await A.click('[data-act=imtab][data-id=drop]');
   check('starter outfit cannot be dropped', await A.$eval('[data-act=imdrop]', e => e.disabled)); await A.click('[data-act=closemodal]');
   // Ann: list 1 pt10 for 120 coins to everyone
-  await A.click('[data-act=itemmenu][data-id=pt10]'); await A.click('[data-act=imtab][data-id=trade]'); await A.fill('#im_coin', '50'); await A.click('[data-act=imtrade]'); await wait(600); check('price below the rarity range is refused', Object.keys((await S(A)).trades).length === 0); await A.click('[data-act=itemmenu][data-id=pt10]').catch(() => {}); await A.click('[data-act=imtab][data-id=trade]').catch(() => {}); await A.fill('#im_coin', '1500'); await A.screenshot({ path: 'm2-trade.png' }); await A.click('[data-act=imtrade]'); await wait(1500);
+  await A.evaluate(() => { const b = document.querySelector('.wd-groups [data-id=pet]'); b && b.click() }); await A.click('[data-act=itemmenu][data-id=pt10]'); await A.click('[data-act=imtab][data-id=trade]'); await A.fill('#im_coin', '50'); await A.click('[data-act=imtrade]'); await wait(600); check('price below the rarity range is refused', Object.keys((await S(A)).trades).length === 0); await A.evaluate(() => { const b = document.querySelector('.wd-groups [data-id=pet]'); b && b.click() }); await A.click('[data-act=itemmenu][data-id=pt10]').catch(() => {}); await A.click('[data-act=imtab][data-id=trade]').catch(() => {}); await A.fill('#im_coin', '1500'); await A.screenshot({ path: 'm2-trade.png' }); await A.click('[data-act=imtrade]'); await wait(1500);
   a = await S(A); const tid = Object.keys(a.trades)[0];
   check('offer escrows the item', a.owned.pt10 === 1 && a.trades[tid].st === 'open', JSON.stringify(a.trades));
   // Ben sees it in the market and accepts
@@ -52,7 +52,7 @@ const URL = 'file:///home/claude/trilingua/index.html';
   check('trade completes both sides', a.trades[tid].st === 'done' && a.trades[tid].by === 'u_bbb' && b.owned.pt10 === 1 && b.coin === bc0 - 1500, JSON.stringify({ at: a.trades[tid], bpt: b.owned.pt10, bdc: bc0 - b.coin, fee: (a.log.filter(e => e.k === 'tdone')[0] || {}).fee }));
   check('seller got the coins minus 5% fee (1500 - 75)', a.coin === coin0 + 600 + 1425, String(a.coin - coin0));
   // cancel flow
-  await A.evaluate(() => document.querySelector('nav [data-id=wd]').click()); await A.click('[data-act=itemmenu][data-id=pt10]'); await A.click('[data-act=imtab][data-id=trade]'); await A.click('[data-act=imwk][data-id=item]'); await A.fill('#im_q', 'pt11'); await wait(100); await A.click('[data-act=imtrade]'); await wait(800);
+  await A.evaluate(() => document.querySelector('nav [data-id=wd]').click()); await A.evaluate(() => { const b = document.querySelector('.wd-groups [data-id=pet]'); b && b.click() }); await A.click('[data-act=itemmenu][data-id=pt10]'); await A.click('[data-act=imtab][data-id=trade]'); await A.click('[data-act=imwk][data-id=item]'); await A.fill('#im_q', 'pt11'); await wait(100); await A.click('[data-act=imtrade]'); await wait(800);
   a = await S(A); const tid2 = Object.keys(a.trades).find(k => k !== tid);
   check('item-for-item offer posted', a.trades[tid2] && a.trades[tid2].want.item === 'pt11' && !a.owned.pt10, JSON.stringify(a.trades[tid2]));
   await A.click(`[data-act=mkcancel][data-id=${tid2}]`); await wait(500); a = await S(A);
@@ -79,7 +79,7 @@ const URL = 'file:///home/claude/trilingua/index.html';
   vb = await verdict('u_bbb');
   check('forged trade receipt is caught', vb && vb.errs > 0 && /tcross/.test(vb.msgs), JSON.stringify(vb));
   await A.evaluate(() => { const S = window.__TLQ.S(); for (let i = 0; i < 6; i++) S.trades['tfk' + i] = { item: 'pt10', n: 1, want: { coin: 1500 }, to: '', st: 'open', by: '', t: Date.now() } });
-  await A.evaluate(() => document.querySelector('nav [data-id=wd]').click()); await A.click('[data-act=itemmenu][data-id=pt10]'); await A.click('[data-act=imtab][data-id=trade]'); await A.fill('#im_coin', '1500'); await A.click('[data-act=imtrade]'); await wait(600);
+  await A.evaluate(() => document.querySelector('nav [data-id=wd]').click()); await A.evaluate(() => { const b = document.querySelector('.wd-groups [data-id=pet]'); b && b.click() }); await A.click('[data-act=itemmenu][data-id=pt10]'); await A.click('[data-act=imtab][data-id=trade]'); await A.fill('#im_coin', '1500'); await A.click('[data-act=imtrade]'); await wait(600);
   check('7th item on the stall is refused', Object.keys((await S(A)).trades).length === 8 && (await S(A)).owned.pt10 === 1, Object.keys((await S(A)).trades).length + ' trades, pt10=' + (await S(A)).owned.pt10);
   await A.evaluate(() => { const S = window.__TLQ.S(); for (let i = 0; i < 6; i++) delete S.trades['tfk' + i] });
   await A0.click('[data-act=admtab][data-id=town]'); await wait(2500); await A0.click('[data-act=admtab][data-id=overview]'); await wait(200); await A0.click('[data-act=admtab][data-id=town]'); await wait(1500);

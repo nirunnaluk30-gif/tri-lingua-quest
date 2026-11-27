@@ -34,7 +34,7 @@ const URL = 'file:///home/claude/trilingua/index.html';
 
   // Ann lists pt10 for 1500 then goes offline
   await A.evaluate(() => document.querySelector('nav [data-id=wd]').click()); await A.click('[data-act=wdmanage]');
-  await A.click('[data-act=itemmenu][data-id=pt10]'); await A.click('[data-act=imtab][data-id=trade]'); await A.fill('#im_coin', '1500'); await A.click('[data-act=imtrade]'); await wait(1500);
+  await A.evaluate(() => { const b = document.querySelector('.wd-groups [data-id=pet]'); b && b.click() }); await A.click('[data-act=itemmenu][data-id=pt10]'); await A.click('[data-act=imtab][data-id=trade]'); await A.fill('#im_coin', '1500'); await A.click('[data-act=imtrade]'); await wait(1500);
   a = await S(A); const tid = Object.keys(a.trades)[0]; const acoin0 = a.coin; check('offer listed', a.trades[tid] && a.trades[tid].st === 'open');
   await A.close();
   const goMk = async (P) => { await P.evaluate(() => document.querySelector('nav [data-id=wd]').click()); await P.click('[data-act=go][data-id=market]'); await wait(1200) };
@@ -56,7 +56,7 @@ const URL = 'file:///home/claude/trilingua/index.html';
   a = await S(A2); check('seller settles on return: done by Ben, coins minus 5% fee', a.trades[tid].st === 'done' && a.trades[tid].by === 'u_bbb' && a.coin === acoin0 + 1425, JSON.stringify({ tr: a.trades[tid], dc: a.coin - acoin0 }));
   // cancel through the claim
   await A2.evaluate(() => document.querySelector('nav [data-id=wd]').click()); await A2.click('[data-act=wdmanage]');
-  await A2.click('[data-act=itemmenu][data-id=pt10]'); await A2.click('[data-act=imtab][data-id=trade]'); await A2.fill('#im_coin', '1500'); await A2.click('[data-act=imtrade]'); await wait(1500);
+  await A2.evaluate(() => { const b = document.querySelector('.wd-groups [data-id=pet]'); b && b.click() }); await A2.click('[data-act=itemmenu][data-id=pt10]'); await A2.click('[data-act=imtab][data-id=trade]'); await A2.fill('#im_coin', '1500'); await A2.click('[data-act=imtrade]'); await wait(1500);
   a = await S(A2); const tid2 = Object.keys(a.trades).find(k => k !== tid);
   await A2.click(`[data-act=mkcancel][data-id=${tid2}]`); await wait(800); a = await S(A2);
   d = await db(A2); check('cancel claims the offer for the seller and returns the item', a.trades[tid2].st === 'cancel' && a.owned.pt10 === 2 && d['mkclaim/u_aaa__' + tid2].by === 'u_aaa', JSON.stringify({ st: a.trades[tid2] && a.trades[tid2].st, pt: a.owned.pt10, cl: d['mkclaim/u_aaa__' + tid2] }));

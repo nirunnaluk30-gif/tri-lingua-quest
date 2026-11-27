@@ -32,15 +32,15 @@ const URL = 'file:///home/claude/trilingua/index.html';
   check('gifts arrived', a.owned.pt10 === 3 && b.coin >= 500, a.owned.pt10 + ' / ' + b.coin);
   // Ann: manage mode -> sell 1 pt10
   await A.evaluate(() => document.querySelector('nav [data-id=wd]').click()); await A.click('[data-act=wdmanage]');
-  await A.click('[data-act=itemmenu][data-id=pt10]'); await A.screenshot({ path: 'm1-menu.png' });
+  await A.evaluate(() => { const b = document.querySelector('.wd-groups [data-id=pet]'); b && b.click() }); await A.click('[data-act=itemmenu][data-id=pt10]'); await A.screenshot({ path: 'm1-menu.png' });
   const coin0 = a.coin; await A.click('[data-act=imsell]'); a = await S(A);
   check('sell gives coins and removes item', a.owned.pt10 === 2 && a.coin === coin0 + 600, a.owned.pt10 + ' ' + (a.coin - coin0));
   // Ann: drop starter -> blocked
   const starter = Object.keys(a.owned).find(k => /^sof|^som/.test(k));
-  await A.click(`[data-act=itemmenu][data-id=${starter}]`); await A.click('[data-act=imtab][data-id=drop]');
+  await A.evaluate(() => { const b = document.querySelector('.wd-groups [data-id=wear]'); b && b.click() }); await A.click(`[data-act=itemmenu][data-id=${starter}]`); await A.click('[data-act=imtab][data-id=drop]');
   check('starter outfit cannot be dropped', await A.$eval('[data-act=imdrop]', e => e.disabled)); await A.click('[data-act=closemodal]');
   // Ann: list 1 pt10 for 120 coins to everyone
-  await A.click('[data-act=itemmenu][data-id=pt10]'); await A.click('[data-act=imtab][data-id=trade]'); await A.fill('#im_coin', '120'); await A.screenshot({ path: 'm2-trade.png' }); await A.click('[data-act=imtrade]'); await wait(1500);
+  await A.evaluate(() => { const b = document.querySelector('.wd-groups [data-id=pet]'); b && b.click() }); await A.click('[data-act=itemmenu][data-id=pt10]'); await A.click('[data-act=imtab][data-id=trade]'); await A.fill('#im_coin', '120'); await A.screenshot({ path: 'm2-trade.png' }); await A.click('[data-act=imtrade]'); await wait(1500);
   a = await S(A); const tid = Object.keys(a.trades)[0];
   check('offer escrows the item', a.owned.pt10 === 1 && a.trades[tid].st === 'open', JSON.stringify(a.trades));
   // Ben sees it in the market and accepts
@@ -52,7 +52,7 @@ const URL = 'file:///home/claude/trilingua/index.html';
   check('trade completes both sides', a.trades[tid].st === 'done' && a.trades[tid].by === 'u_bbb' && b.owned.pt10 === 1 && b.coin === bc0 - 120, JSON.stringify({ at: a.trades[tid], bpt: b.owned.pt10, bdc: bc0 - b.coin }));
   check('seller got the coins', a.coin === coin0 + 600 + 120, String(a.coin - coin0));
   // cancel flow
-  await A.evaluate(() => document.querySelector('nav [data-id=wd]').click()); await A.click('[data-act=itemmenu][data-id=pt10]'); await A.click('[data-act=imtab][data-id=trade]'); await A.click('[data-act=imwk][data-id=item]'); await A.fill('#im_q', 'pt11'); await wait(100); await A.click('[data-act=imtrade]'); await wait(800);
+  await A.evaluate(() => document.querySelector('nav [data-id=wd]').click()); await A.evaluate(() => { const b = document.querySelector('.wd-groups [data-id=pet]'); b && b.click() }); await A.click('[data-act=itemmenu][data-id=pt10]'); await A.click('[data-act=imtab][data-id=trade]'); await A.click('[data-act=imwk][data-id=item]'); await A.fill('#im_q', 'pt11'); await wait(100); await A.click('[data-act=imtrade]'); await wait(800);
   a = await S(A); const tid2 = Object.keys(a.trades).find(k => k !== tid);
   check('item-for-item offer posted', a.trades[tid2] && a.trades[tid2].want.item === 'pt11' && !a.owned.pt10, JSON.stringify(a.trades[tid2]));
   await A.click(`[data-act=mkcancel][data-id=${tid2}]`); a = await S(A);
